@@ -16,8 +16,12 @@ export class YamlFixtureProcessor {
     async processFixtures(
         filename: string,
         adminApiContext: any,
-        systemData: { [key: string]: any } = {}
+        systemData: { [key: string]: any } = {},
+        processedDependencies: Set<string> = new Set()
     ): Promise<{ [key: string]: any }> {
+        // Check for @depends directive and process dependencies first
+        const dependencyResults = await this.processDependencies(filename, adminApiContext, systemData, processedDependencies);
+
         const fixtureConfig = await this.loader.loadFixtures(filename);
 
         // Add system data to references (salutations, countries, etc.)
@@ -28,7 +32,8 @@ export class YamlFixtureProcessor {
         // Expand multi-insertion fixtures (e.g., business_partner_{1...10})
         const expandedFixtures = this.expandMultiInsertionFixtures(fixtureConfig.fixtures);
 
-        const results: { [key: string]: any } = {};
+        // Start with dependency results
+        const results: { [key: string]: any } = { ...dependencyResults };
 
         // Use circular reference resolver for processing
         const resolver = new CircularReferenceResolver(this.references);
@@ -96,6 +101,58 @@ export class YamlFixtureProcessor {
         }
 
         return results;
+    }
+
+    /**
+     * Process @depends directives and ensure dependencies are processed first
+     */
+    private async processDependencies(
+        filename: string,
+        adminApiContext: any,
+        systemData: { [key: string]: any } = {},
+        processedDependencies: Set<string> = new Set()
+    ): Promise<{ [key: string]: any }> {
+        // Add current file to processed dependencies to prevent circular dependencies
+        if (processedDependencies.has(filename)) {
+            throw new Error(`Circular dependency detected: ${filename} is already being processed`);
+        }
+
+        processedDependencies.add(filename);
+
+        try {
+            // Load the raw YAML content to check for @depends directive
+            const filePath = require('path').join(this.loader.getFixturesDir(), filename);
+            if (!require('fs').existsSync(filePath)) {
+                // If file doesn't exist, return empty result (might be in test/mock environment)
+                return {};
+            }
+
+            const fileContent = require('fs').readFileSync(filePath, 'utf8');
+            const parsedYaml = require('js-yaml').load(fileContent) as any;
+
+            if (parsedYaml && parsedYaml['@depends']) {
+                const dependsFile = parsedYaml['@depends'];
+                
+                if (typeof dependsFile !== 'string') {
+                    throw new Error(`@depends directive must be a string, got ${typeof dependsFile} in ${filename}`);
+                }
+
+                // Check for circular dependencies
+                if (processedDependencies.has(dependsFile)) {
+                    throw new Error(`Circular dependency detected: ${dependsFile} is already being processed in the chain starting from ${filename}`);
+                }
+
+                // Recursively process the dependent fixture first and return its results
+                return await this.processFixtures(dependsFile, adminApiContext, systemData, new Set(processedDependencies));
+            }
+
+            return {};
+        } catch (error) {
+            if (error instanceof Error) {
+                throw error;
+            }
+            throw new Error(`Failed to process dependencies for ${filename}: ${String(error)}`);
+        }
     }
 
     /**

@@ -141,6 +141,72 @@ vat_number: "{faker.vatNumber}" # Italian VAT number
 
 ## Advanced Features
 
+### @include Directive
+
+Reuse and merge fixture data from other YAML files using the `@include` directive at the top of your file:
+
+```yaml
+'@include': 'base_users.yml'
+fixtures:
+  custom_user:
+    entity: customer
+    data:
+      firstName: "Custom"
+      lastName: "User"
+      email: "custom@example.com"
+  # Override data from included file
+  admin_user:
+    entity: customer
+    data:
+      firstName: "Override Admin"
+      role: "super_admin"
+```
+
+**Key features:**
+- Current file data overrides included file data when fixture names match
+- Supports nested includes (included files can also include other files)
+- Prevents circular includes with clear error messages
+- Merges all fixture data seamlessly
+
+### @depends Directive
+
+Ensure fixtures are processed in the correct order using the `@depends` directive:
+
+```yaml
+'@depends': 'customers.yml'
+fixtures:
+  order_1:
+    entity: order
+    data:
+      customerId: "@customer_1"
+      orderDate: "{faker.date.recent}"
+      items:
+        - productId: "@product_1"
+          quantity: 2
+```
+
+**Key features:**
+- Dependent fixtures are automatically processed first
+- Supports nested dependencies (dependencies can have their own dependencies)
+- Prevents circular dependencies with clear error messages
+- Ensures all referenced entities exist before processing current fixtures
+
+### Combined Usage
+
+You can use both directives in the same file:
+
+```yaml
+'@depends': 'base_entities.yml'  # Process dependencies first
+'@include': 'shared_data.yml'    # Then merge shared fixture data
+fixtures:
+  my_entity:
+    entity: custom_entity
+    data:
+      name: "My Entity"
+      baseId: "@base_entity"      # From dependency
+      sharedValue: "@shared_data" # From included file
+```
+
 ### Multi-insertion Fixtures
 
 Create multiple similar entities using range syntax:

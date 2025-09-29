@@ -5,7 +5,8 @@ import { TEST_FIXTURES_DIR } from './setup';
 
 const mockLoader = {
     loadFixtures: jest.fn(),
-    processFixtureData: jest.fn()
+    processFixtureData: jest.fn(),
+    getFixturesDir: jest.fn().mockReturnValue('/mock/fixtures/dir')
 };
 
 jest.mock('../YamlFixtureLoader', () => {

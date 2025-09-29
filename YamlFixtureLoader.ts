@@ -26,6 +26,13 @@ export class YamlFixtureLoader {
     }
 
     /**
+     * Get the fixtures directory path
+     */
+    getFixturesDir(): string {
+        return this.fixturesDir;
+    }
+
+    /**
      * Load fixtures from YAML file
      */
     async loadFixtures(filename: string): Promise<YamlFixtureConfig> {
@@ -45,12 +52,15 @@ export class YamlFixtureLoader {
             const fileContent = fs.readFileSync(filePath, 'utf8');
             const parsedYaml = yaml.load(fileContent) as any;
 
-            // If the parsed YAML doesn't have a fixtures property, wrap it
+            // Process @include directives first
+            const processedYaml = await this.processIncludeDirectives(parsedYaml, filename);
+
+            // If the processed YAML doesn't have a fixtures property, wrap it
             let config: YamlFixtureConfig;
-            if (parsedYaml && typeof parsedYaml === 'object' && !parsedYaml.fixtures) {
-                config = { fixtures: parsedYaml };
+            if (processedYaml && typeof processedYaml === 'object' && !processedYaml.fixtures) {
+                config = { fixtures: processedYaml };
             } else {
-                config = parsedYaml as YamlFixtureConfig;
+                config = processedYaml as YamlFixtureConfig;
             }
 
             // Cache the parsed fixtures
@@ -61,6 +71,89 @@ export class YamlFixtureLoader {
             const errorMessage = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to parse YAML fixture file ${filename}: ${errorMessage}`);
         }
+    }
+
+    /**
+     * Process @include directives in YAML files
+     */
+    private async processIncludeDirectives(yamlData: any, currentFilename: string, processedFiles: Set<string> = new Set()): Promise<any> {
+        if (!yamlData || typeof yamlData !== 'object') {
+            return yamlData;
+        }
+
+        // Add current file to processed files to prevent circular includes
+        processedFiles.add(currentFilename);
+
+        // Check for @include directive
+        if (yamlData['@include']) {
+            const includeFile = yamlData['@include'];
+            
+            if (typeof includeFile !== 'string') {
+                throw new Error(`@include directive must be a string, got ${typeof includeFile} in ${currentFilename}`);
+            }
+
+            // Check for circular includes
+            if (processedFiles.has(includeFile)) {
+                throw new Error(`Circular include detected: ${includeFile} is already being processed in the chain starting from ${currentFilename}`);
+            }
+
+            // Load the included file
+            const includedFilePath = path.join(this.fixturesDir, includeFile);
+            if (!fs.existsSync(includedFilePath)) {
+                throw new Error(`Included fixture file not found: ${includedFilePath}`);
+            }
+
+            const includedContent = fs.readFileSync(includedFilePath, 'utf8');
+            const includedYaml = yaml.load(includedContent) as any;
+
+            // Recursively process includes in the included file
+            const processedIncludedYaml = await this.processIncludeDirectives(includedYaml, includeFile, new Set(processedFiles));
+
+            // Merge the included data with current data
+            let mergedData: any = {};
+
+            // Start with included data as base
+            if (processedIncludedYaml) {
+                if (processedIncludedYaml.fixtures) {
+                    mergedData.fixtures = { ...processedIncludedYaml.fixtures };
+                } else {
+                    mergedData = { ...processedIncludedYaml };
+                }
+            }
+
+            // Merge current file data (excluding @include directive)
+            const currentDataWithoutInclude = { ...yamlData };
+            delete currentDataWithoutInclude['@include'];
+
+            if (currentDataWithoutInclude.fixtures) {
+                mergedData.fixtures = { 
+                    ...(mergedData.fixtures || {}), 
+                    ...currentDataWithoutInclude.fixtures 
+                };
+                // Merge other properties at root level
+                Object.keys(currentDataWithoutInclude).forEach(key => {
+                    if (key !== 'fixtures') {
+                        mergedData[key] = currentDataWithoutInclude[key];
+                    }
+                });
+            } else {
+                // If current data doesn't have fixtures property, merge at root level
+                Object.keys(currentDataWithoutInclude).forEach(key => {
+                    if (key === 'fixtures') {
+                        mergedData.fixtures = { 
+                            ...(mergedData.fixtures || {}), 
+                            ...currentDataWithoutInclude[key] 
+                        };
+                    } else {
+                        mergedData[key] = currentDataWithoutInclude[key];
+                    }
+                });
+            }
+
+            return mergedData;
+        }
+
+        return yamlData;
     }
 
     /**
