@@ -76,7 +76,7 @@ export class YamlFixtureLoader {
   /**
      * Process @includes directives in YAML files
      */
-  private async processIncludeDirectives(yamlData: any, currentFilename: string, processedFiles: Set<string> = new Set()): Promise<any> {
+  private async processIncludeDirectives(yamlData: any, currentFilename: string, processedFiles: Set<string> = new Set(), processedDependencies: Set<string> = new Set()): Promise<any> {
     if (!yamlData || typeof yamlData !== 'object') {
       return yamlData;
     }
@@ -122,40 +122,30 @@ export class YamlFixtureLoader {
         const includedYaml = yaml.load(includedContent) as any;
 
         // Recursively process includes in the included file
-        const processedIncludedYaml = await this.processIncludeDirectives(includedYaml, includeFile, new Set(processedFiles));
+        const processedIncludedYaml = await this.processIncludeDirectives(includedYaml, includeFile, new Set(processedFiles), processedDependencies);
 
-        // If the included file has @depends, also process those dependencies
+        // If the included file has @depends, also process those dependencies (but avoid duplicates)
         if (processedIncludedYaml && processedIncludedYaml['@depends']) {
           const dependsFiles = Array.isArray(processedIncludedYaml['@depends'])
             ? processedIncludedYaml['@depends']
             : [processedIncludedYaml['@depends']];
 
           for (const depFile of dependsFiles) {
+            // Skip if this dependency has already been processed
+            if (processedDependencies.has(depFile)) {
+              continue;
+            }
+
             // Check for circular dependencies
             if (processedFiles.has(depFile)) {
               throw new Error(`Circular dependency detected: ${depFile} is already being processed in the chain starting from ${currentFilename}`);
             }
 
-            // Load and process the dependency file
-            const depFilePath = path.join(this.fixturesDir, depFile);
-            if (fs.existsSync(depFilePath)) {
-              const depContent = fs.readFileSync(depFilePath, 'utf8');
-              const depYaml = yaml.load(depContent) as any;
-              const processedDepYaml = await this.processIncludeDirectives(depYaml, depFile, new Set(processedFiles));
+            // Mark this dependency as processed
+            processedDependencies.add(depFile);
 
-              // Merge dependency fixtures into the included file
-              if (processedDepYaml && processedDepYaml.fixtures) {
-                if (!processedIncludedYaml.fixtures) {
-                  processedIncludedYaml.fixtures = {};
-                }
-                // Add dependency fixtures (don't override existing fixtures)
-                Object.keys(processedDepYaml.fixtures).forEach(fixtureName => {
-                  if (!processedIncludedYaml.fixtures[fixtureName]) {
-                    processedIncludedYaml.fixtures[fixtureName] = processedDepYaml.fixtures[fixtureName];
-                  }
-                });
-              }
-            }
+            // Don't process dependency fixtures here - let YamlFixtureProcessor handle them
+            // This prevents duplicate entity creation
           }
         }
 

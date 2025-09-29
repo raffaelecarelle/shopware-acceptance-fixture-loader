@@ -17,23 +17,29 @@ export class YamlFixtureProcessor {
     filename: string | string[],
     adminApiContext: any,
     systemData: { [key: string]: any } = {},
-    processedDependencies: Set<string> = new Set()
+    processedDependencies: Set<string> = new Set(),
+    completedFiles: Set<string> = new Set()
   ): Promise<{ [key: string]: any }> {
     // Handle array of filenames
     if (Array.isArray(filename)) {
       let mergedResults: { [key: string]: any } = {};
       
       for (const file of filename) {
-        const fileResults = await this.processFixtures(file, adminApiContext, systemData, processedDependencies);
+        const fileResults = await this.processFixtures(file, adminApiContext, systemData, processedDependencies, completedFiles);
         mergedResults = { ...mergedResults, ...fileResults };
       }
       
       return mergedResults;
     }
 
+    // Skip processing if this file has already been completed
+    if (completedFiles.has(filename)) {
+      return {};
+    }
+
     // Process single file (existing logic)
     // Check for @depends directive and process dependencies first
-    const dependencyResults = await this.processDependencies(filename, adminApiContext, systemData, processedDependencies);
+    const dependencyResults = await this.processDependencies(filename, adminApiContext, systemData, processedDependencies, completedFiles);
 
     const fixtureConfig = await this.loader.loadFixtures(filename);
 
@@ -113,6 +119,9 @@ export class YamlFixtureProcessor {
       }
     }
 
+    // Mark this file as completed
+    completedFiles.add(filename);
+
     return results;
   }
 
@@ -123,14 +132,15 @@ export class YamlFixtureProcessor {
     filename: string | string[],
     adminApiContext: any,
     systemData: { [key: string]: any } = {},
-    processedDependencies: Set<string> = new Set()
+    processedDependencies: Set<string> = new Set(),
+    completedFiles: Set<string> = new Set()
   ): Promise<{ [key: string]: any }> {
     // Handle array of filenames
     if (Array.isArray(filename)) {
       let mergedResults: { [key: string]: any } = {};
       
       for (const file of filename) {
-        const fileResults = await this.processDependencies(file, adminApiContext, systemData, processedDependencies);
+        const fileResults = await this.processDependencies(file, adminApiContext, systemData, processedDependencies, completedFiles);
         mergedResults = { ...mergedResults, ...fileResults };
       }
 
@@ -146,18 +156,12 @@ export class YamlFixtureProcessor {
     processedDependencies.add(filename);
 
     try {
-      // Load the raw YAML content to check for @depends directive
-      const filePath = require('path').join(this.loader.getFixturesDir(), filename);
-      if (!require('fs').existsSync(filePath)) {
-        // If file doesn't exist, return empty result (might be in test/mock environment)
-        return {};
-      }
+      // Use the YamlFixtureLoader to get the processed YAML (including @includes processing)
+      // This ensures we get the complete merged @depends from both the file and its includes
+      const fixtureConfig = await this.loader.loadFixtures(filename);
 
-      const fileContent = require('fs').readFileSync(filePath, 'utf8');
-      const parsedYaml = require('js-yaml').load(fileContent) as any;
-
-      if (parsedYaml && parsedYaml['@depends']) {
-        const dependsFile = parsedYaml['@depends'];
+      if (fixtureConfig && (fixtureConfig as any)['@depends']) {
+        const dependsFile = (fixtureConfig as any)['@depends'];
         
         // Support both string and array formats
         let dependsFiles: string[];
@@ -182,10 +186,9 @@ export class YamlFixtureProcessor {
           }
 
           // Recursively process the dependent fixture and merge its results
-          const depResults = await this.processFixtures(depFile, adminApiContext, systemData, new Set(processedDependencies));
+          const depResults = await this.processFixtures(depFile, adminApiContext, systemData, new Set(processedDependencies), completedFiles);
           mergedResults = { ...mergedResults, ...depResults };
         }
-        
         return mergedResults;
       }
 
