@@ -52,7 +52,7 @@ export class YamlFixtureLoader {
       const fileContent = fs.readFileSync(filePath, 'utf8');
       const parsedYaml = yaml.load(fileContent) as any;
 
-      // Process @include directives first
+      // Process @includes directives first
       const processedYaml = await this.processIncludeDirectives(parsedYaml, filename);
 
       // If the processed YAML doesn't have a fixtures property, wrap it
@@ -74,7 +74,7 @@ export class YamlFixtureLoader {
   }
 
   /**
-     * Process @include directives in YAML files
+     * Process @includes directives in YAML files
      */
   private async processIncludeDirectives(yamlData: any, currentFilename: string, processedFiles: Set<string> = new Set()): Promise<any> {
     if (!yamlData || typeof yamlData !== 'object') {
@@ -84,70 +84,125 @@ export class YamlFixtureLoader {
     // Add current file to processed files to prevent circular includes
     processedFiles.add(currentFilename);
 
-    // Check for @include directive
-    if (yamlData['@include']) {
-      const includeFile = yamlData['@include'];
+    // Check for @includes directive
+    if (yamlData['@includes']) {
+      const includeFile = yamlData['@includes'];
             
-      if (typeof includeFile !== 'string') {
-        throw new Error(`@include directive must be a string, got ${typeof includeFile} in ${currentFilename}`);
-      }
-
-      // Check for circular includes
-      if (processedFiles.has(includeFile)) {
-        throw new Error(`Circular include detected: ${includeFile} is already being processed in the chain starting from ${currentFilename}`);
-      }
-
-      // Load the included file
-      const includedFilePath = path.join(this.fixturesDir, includeFile);
-      if (!fs.existsSync(includedFilePath)) {
-        throw new Error(`Included fixture file not found: ${includedFilePath}`);
-      }
-
-      const includedContent = fs.readFileSync(includedFilePath, 'utf8');
-      const includedYaml = yaml.load(includedContent) as any;
-
-      // Recursively process includes in the included file
-      const processedIncludedYaml = await this.processIncludeDirectives(includedYaml, includeFile, new Set(processedFiles));
-
-      // Merge the included data with current data
-      let mergedData: any = {};
-
-      // Start with included data as base
-      if (processedIncludedYaml) {
-        if (processedIncludedYaml.fixtures) {
-          mergedData.fixtures = { ...processedIncludedYaml.fixtures };
-        } else {
-          mergedData = { ...processedIncludedYaml };
+      // Support both string and array formats
+      let includeFiles: string[];
+      if (typeof includeFile === 'string') {
+        includeFiles = [includeFile];
+      } else if (Array.isArray(includeFile)) {
+        if (includeFile.some(f => typeof f !== 'string')) {
+          throw new Error(`@includes directive array must contain only strings in ${currentFilename}`);
         }
+        includeFiles = includeFile;
+      } else {
+        throw new Error(`@includes directive must be a string or array of strings, got ${typeof includeFile} in ${currentFilename}`);
       }
 
-      // Merge current file data (excluding @include directive)
-      const currentDataWithoutInclude = { ...yamlData };
-      delete currentDataWithoutInclude['@include'];
+      // Initialize merged data with current file data (excluding @includes directive)
+      const mergedData: any = { ...yamlData };
+      delete mergedData['@includes'];
 
-      if (currentDataWithoutInclude.fixtures) {
-        mergedData.fixtures = { 
-          ...(mergedData.fixtures || {}), 
-          ...currentDataWithoutInclude.fixtures 
-        };
-        // Merge other properties at root level
-        Object.keys(currentDataWithoutInclude).forEach(key => {
-          if (key !== 'fixtures') {
-            mergedData[key] = currentDataWithoutInclude[key];
-          }
-        });
-      } else {
-        // If current data doesn't have fixtures property, merge at root level
-        Object.keys(currentDataWithoutInclude).forEach(key => {
-          if (key === 'fixtures') {
-            mergedData.fixtures = { 
-              ...(mergedData.fixtures || {}), 
-              ...currentDataWithoutInclude[key] 
-            };
+      // Process each include file and merge them sequentially
+      for (const includeFile of includeFiles) {
+        // Check for circular includes
+        if (processedFiles.has(includeFile)) {
+          throw new Error(`Circular include detected: ${includeFile} is already being processed in the chain starting from ${currentFilename}`);
+        }
+
+        // Load the included file
+        const includedFilePath = path.join(this.fixturesDir, includeFile);
+        if (!fs.existsSync(includedFilePath)) {
+          throw new Error(`Included fixture file not found: ${includedFilePath}`);
+        }
+
+        const includedContent = fs.readFileSync(includedFilePath, 'utf8');
+        const includedYaml = yaml.load(includedContent) as any;
+
+        // Recursively process includes in the included file
+        const processedIncludedYaml = await this.processIncludeDirectives(includedYaml, includeFile, new Set(processedFiles));
+
+        // Merge the included data with current merged data
+        if (processedIncludedYaml) {
+          if (processedIncludedYaml.fixtures) {
+            // Deep merge fixtures section - current file data overrides included data
+            const includedFixtures = processedIncludedYaml.fixtures;
+            const currentFixtures = mergedData.fixtures || {};
+            
+            // Start with included fixtures as base
+            const mergedFixtures: any = { ...includedFixtures };
+            
+            // Deep merge each fixture that exists in both files
+            Object.keys(currentFixtures).forEach(fixtureName => {
+              if (includedFixtures[fixtureName]) {
+                // Both files have this fixture - deep merge the data
+                mergedFixtures[fixtureName] = {
+                  ...includedFixtures[fixtureName],
+                  ...currentFixtures[fixtureName]
+                };
+                
+                // Special handling for the 'data' property - deep merge it
+                if (includedFixtures[fixtureName].data && currentFixtures[fixtureName].data) {
+                  mergedFixtures[fixtureName].data = {
+                    ...includedFixtures[fixtureName].data,
+                    ...currentFixtures[fixtureName].data
+                  };
+                }
+              } else {
+                // Only current file has this fixture
+                mergedFixtures[fixtureName] = currentFixtures[fixtureName];
+              }
+            });
+            
+            mergedData.fixtures = mergedFixtures;
+            
+            // Merge other properties at root level from included file
+            Object.keys(processedIncludedYaml).forEach(key => {
+              if (key !== 'fixtures') {
+                mergedData[key] = processedIncludedYaml[key];
+              }
+            });
           } else {
-            mergedData[key] = currentDataWithoutInclude[key];
+            // If included data doesn't have fixtures property, merge at root level
+            Object.keys(processedIncludedYaml).forEach(key => {
+              if (key === 'fixtures') {
+                const includedFixtures = processedIncludedYaml[key];
+                const currentFixtures = mergedData.fixtures || {};
+                
+                // Start with included fixtures as base
+                const mergedFixtures: any = { ...includedFixtures };
+                
+                // Deep merge each fixture that exists in both files
+                Object.keys(currentFixtures).forEach(fixtureName => {
+                  if (includedFixtures[fixtureName]) {
+                    // Both files have this fixture - deep merge the data
+                    mergedFixtures[fixtureName] = {
+                      ...includedFixtures[fixtureName],
+                      ...currentFixtures[fixtureName]
+                    };
+                    
+                    // Special handling for the 'data' property - deep merge it
+                    if (includedFixtures[fixtureName].data && currentFixtures[fixtureName].data) {
+                      mergedFixtures[fixtureName].data = {
+                        ...includedFixtures[fixtureName].data,
+                        ...currentFixtures[fixtureName].data
+                      };
+                    }
+                  } else {
+                    // Only current file has this fixture
+                    mergedFixtures[fixtureName] = currentFixtures[fixtureName];
+                  }
+                });
+                
+                mergedData.fixtures = mergedFixtures;
+              } else {
+                mergedData[key] = processedIncludedYaml[key];
+              }
+            });
           }
-        });
+        }
       }
 
       return mergedData;

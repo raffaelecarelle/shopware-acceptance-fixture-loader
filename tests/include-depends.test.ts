@@ -25,7 +25,7 @@ describe('Include and Depends Functionality', () => {
         }
     });
 
-    describe('@include functionality', () => {
+    describe('@includes functionality', () => {
         it('should include and merge fixture data from another file', async () => {
             // Create base fixture file
             const baseFixturePath = path.join(testFixturesDir, 'base_users.yml');
@@ -49,7 +49,7 @@ fixtures:
             // Create file that includes the base
             const mainFixturePath = path.join(testFixturesDir, 'main_users.yml');
             fs.writeFileSync(mainFixturePath, `
-'@include': 'base_users.yml'
+'@includes': 'base_users.yml'
 fixtures:
   custom_user:
     entity: User
@@ -100,7 +100,7 @@ fixtures:
             // Create middle level fixture that includes deep
             const middleFixturePath = path.join(testFixturesDir, 'middle.yml');
             fs.writeFileSync(middleFixturePath, `
-'@include': 'deep.yml'
+'@includes': 'deep.yml'
 fixtures:
   middle_entity:
     entity: MiddleEntity
@@ -111,7 +111,7 @@ fixtures:
             // Create top level fixture that includes middle
             const topFixturePath = path.join(testFixturesDir, 'top.yml');
             fs.writeFileSync(topFixturePath, `
-'@include': 'middle.yml'
+'@includes': 'middle.yml'
 fixtures:
   top_entity:
     entity: TopEntity
@@ -132,7 +132,7 @@ fixtures:
             // Create file A that includes file B
             const fileAPath = path.join(testFixturesDir, 'fileA.yml');
             fs.writeFileSync(fileAPath, `
-'@include': 'fileB.yml'
+'@includes': 'fileB.yml'
 fixtures:
   entityA:
     entity: EntityA
@@ -143,7 +143,7 @@ fixtures:
             // Create file B that includes file A (circular)
             const fileBPath = path.join(testFixturesDir, 'fileB.yml');
             fs.writeFileSync(fileBPath, `
-'@include': 'fileA.yml'
+'@includes': 'fileA.yml'
 fixtures:
   entityB:
     entity: EntityB
@@ -157,7 +157,7 @@ fixtures:
         it('should throw error for non-existent include file', async () => {
             const mainFixturePath = path.join(testFixturesDir, 'main.yml');
             fs.writeFileSync(mainFixturePath, `
-'@include': 'nonexistent.yml'
+'@includes': 'nonexistent.yml'
 fixtures:
   test_entity:
     entity: TestEntity
@@ -168,10 +168,61 @@ fixtures:
             await expect(loader.loadFixtures('main.yml')).rejects.toThrow(/Included fixture file not found/);
         });
 
-        it('should throw error for invalid @include directive', async () => {
+        it('should support @includes with array of files', async () => {
+            // Create first base fixture file
+            const baseUsersPath = path.join(testFixturesDir, 'base_users.yml');
+            fs.writeFileSync(baseUsersPath, `
+fixtures:
+  base_user:
+    entity: User
+    data:
+      firstName: "Base"
+      lastName: "User"
+      email: "base@example.com"
+`);
+
+            // Create second base fixture file  
+            const baseProductsPath = path.join(testFixturesDir, 'base_products.yml');
+            fs.writeFileSync(baseProductsPath, `
+fixtures:
+  base_product:
+    entity: Product
+    data:
+      name: "Base Product"
+      price: "10.00"
+`);
+
+            // Create file that includes multiple files as array
             const mainFixturePath = path.join(testFixturesDir, 'main.yml');
             fs.writeFileSync(mainFixturePath, `
-'@include': 123
+'@includes': 
+  - 'base_users.yml'
+  - 'base_products.yml'
+fixtures:
+  custom_entity:
+    entity: Custom
+    data:
+      name: "Custom Entity"
+`);
+
+            const result = await loader.loadFixtures('main.yml');
+
+            // Should have all fixtures from all included files plus the custom one
+            expect(Object.keys(result.fixtures)).toHaveLength(3);
+            expect(result.fixtures.base_user).toBeDefined();
+            expect(result.fixtures.base_product).toBeDefined();
+            expect(result.fixtures.custom_entity).toBeDefined();
+
+            // Verify data from each included file
+            expect(result.fixtures.base_user.data.firstName).toBe('Base');
+            expect(result.fixtures.base_product.data.name).toBe('Base Product');
+            expect(result.fixtures.custom_entity.data.name).toBe('Custom Entity');
+        });
+
+        it('should throw error for invalid @includes directive', async () => {
+            const mainFixturePath = path.join(testFixturesDir, 'main.yml');
+            fs.writeFileSync(mainFixturePath, `
+'@includes': 123
 fixtures:
   test_entity:
     entity: TestEntity
@@ -179,7 +230,23 @@ fixtures:
       name: "Test"
 `);
 
-            await expect(loader.loadFixtures('main.yml')).rejects.toThrow(/@include directive must be a string/);
+            await expect(loader.loadFixtures('main.yml')).rejects.toThrow(/@includes directive must be a string or array of strings/);
+        });
+
+        it('should throw error for @includes array with non-string elements', async () => {
+            const mainFixturePath = path.join(testFixturesDir, 'invalid_array.yml');
+            fs.writeFileSync(mainFixturePath, `
+'@includes': 
+  - 'valid_file.yml'
+  - 123
+fixtures:
+  test_entity:
+    entity: TestEntity
+    data:
+      name: "Test"
+`);
+
+            await expect(loader.loadFixtures('invalid_array.yml')).rejects.toThrow(/@includes directive array must contain only strings/);
         });
     });
 
@@ -343,6 +410,62 @@ fixtures:
             await expect(processor.processFixtures('main.yml', mockApiContext)).rejects.toThrow(/Fixture file not found/);
         });
 
+        it('should support @depends with array of files', async () => {
+            const mockResponse = {
+                ok: jest.fn().mockReturnValue(true),
+                json: jest.fn().mockResolvedValue({ data: { id: 'mock-id' } }),
+                text: jest.fn().mockResolvedValue('Success')
+            };
+            const mockApiContext = {
+                post: jest.fn().mockResolvedValue(mockResponse)
+            };
+
+            // Create first dependency file
+            const dep1Path = path.join(testFixturesDir, 'dep1.yml');
+            fs.writeFileSync(dep1Path, `
+fixtures:
+  dep1_entity:
+    entity: entity
+    data:
+      name: "Dependency 1"
+`);
+
+            // Create second dependency file
+            const dep2Path = path.join(testFixturesDir, 'dep2.yml');
+            fs.writeFileSync(dep2Path, `
+fixtures:
+  dep2_entity:
+    entity: entity
+    data:
+      name: "Dependency 2"
+`);
+
+            // Create main file that depends on multiple files as array
+            const mainPath = path.join(testFixturesDir, 'main_array_deps.yml');
+            fs.writeFileSync(mainPath, `
+'@depends': 
+  - 'dep1.yml'
+  - 'dep2.yml'
+fixtures:
+  main_entity:
+    entity: entity
+    data:
+      name: "Main Entity"
+      dep1Id: "@dep1_entity"
+      dep2Id: "@dep2_entity"
+`);
+
+            const result = await processor.processFixtures('main_array_deps.yml', mockApiContext);
+
+            // All entities should be processed
+            expect(result.dep1_entity).toBeDefined();
+            expect(result.dep2_entity).toBeDefined();
+            expect(result.main_entity).toBeDefined();
+            
+            // API should have been called for all three entities
+            expect(mockApiContext.post).toHaveBeenCalledTimes(3);
+        });
+
         it('should throw error for invalid @depends directive', async () => {
             const mockResponse = {
                 ok: jest.fn().mockReturnValue(true),
@@ -363,12 +486,37 @@ fixtures:
       name: "Test"
 `);
 
-            await expect(processor.processFixtures('main.yml', mockApiContext)).rejects.toThrow(/@depends directive must be a string/);
+            await expect(processor.processFixtures('main.yml', mockApiContext)).rejects.toThrow(/@depends directive must be a string or array of strings/);
+        });
+
+        it('should throw error for @depends array with non-string elements', async () => {
+            const mockResponse = {
+                ok: jest.fn().mockReturnValue(true),
+                json: jest.fn().mockResolvedValue({ data: { id: 'mock-id' } }),
+                text: jest.fn().mockResolvedValue('Success')
+            };
+            const mockApiContext = {
+                post: jest.fn().mockResolvedValue(mockResponse)
+            };
+
+            const mainPath = path.join(testFixturesDir, 'invalid_depends.yml');
+            fs.writeFileSync(mainPath, `
+'@depends': 
+  - 'valid_dep.yml'
+  - 123
+fixtures:
+  test_entity:
+    entity: entity
+    data:
+      name: "Test"
+`);
+
+            await expect(processor.processFixtures('invalid_depends.yml', mockApiContext)).rejects.toThrow(/@depends directive array must contain only strings/);
         });
     });
 
-    describe('Combined @include and @depends functionality', () => {
-        it('should handle both @include and @depends in the same file', async () => {
+    describe('Combined @includes and @depends functionality', () => {
+        it('should handle both @includes and @depends in the same file', async () => {
             const mockResponse = {
                 ok: jest.fn().mockReturnValue(true),
                 json: jest.fn().mockResolvedValue({ data: { id: 'mock-id' } }),
@@ -402,7 +550,7 @@ fixtures:
             const mainPath = path.join(testFixturesDir, 'combined.yml');
             fs.writeFileSync(mainPath, `
 '@depends': 'base_entities.yml'
-'@include': 'shared_entities.yml'
+'@includes': 'shared_entities.yml'
 fixtures:
   main_entity:
     entity: entity

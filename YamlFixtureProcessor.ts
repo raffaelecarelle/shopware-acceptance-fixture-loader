@@ -11,14 +11,27 @@ export class YamlFixtureProcessor {
   }
 
   /**
-     * Load and process fixtures from YAML file with circular reference support
+     * Load and process fixtures from YAML file(s) with circular reference support
      */
   async processFixtures(
-    filename: string,
+    filename: string | string[],
     adminApiContext: any,
     systemData: { [key: string]: any } = {},
     processedDependencies: Set<string> = new Set()
   ): Promise<{ [key: string]: any }> {
+    // Handle array of filenames
+    if (Array.isArray(filename)) {
+      let mergedResults: { [key: string]: any } = {};
+      
+      for (const file of filename) {
+        const fileResults = await this.processFixtures(file, adminApiContext, systemData, processedDependencies);
+        mergedResults = { ...mergedResults, ...fileResults };
+      }
+      
+      return mergedResults;
+    }
+
+    // Process single file (existing logic)
     // Check for @depends directive and process dependencies first
     const dependencyResults = await this.processDependencies(filename, adminApiContext, systemData, processedDependencies);
 
@@ -107,11 +120,24 @@ export class YamlFixtureProcessor {
      * Process @depends directives and ensure dependencies are processed first
      */
   private async processDependencies(
-    filename: string,
+    filename: string | string[],
     adminApiContext: any,
     systemData: { [key: string]: any } = {},
     processedDependencies: Set<string> = new Set()
   ): Promise<{ [key: string]: any }> {
+    // Handle array of filenames
+    if (Array.isArray(filename)) {
+      let mergedResults: { [key: string]: any } = {};
+      
+      for (const file of filename) {
+        const fileResults = await this.processDependencies(file, adminApiContext, systemData, processedDependencies);
+        mergedResults = { ...mergedResults, ...fileResults };
+      }
+
+      return mergedResults;
+    }
+
+    // Process single file (existing logic)
     // Add current file to processed dependencies to prevent circular dependencies
     if (processedDependencies.has(filename)) {
       throw new Error(`Circular dependency detected: ${filename} is already being processed`);
@@ -132,18 +158,35 @@ export class YamlFixtureProcessor {
 
       if (parsedYaml && parsedYaml['@depends']) {
         const dependsFile = parsedYaml['@depends'];
-                
-        if (typeof dependsFile !== 'string') {
-          throw new Error(`@depends directive must be a string, got ${typeof dependsFile} in ${filename}`);
+        
+        // Support both string and array formats
+        let dependsFiles: string[];
+        if (typeof dependsFile === 'string') {
+          dependsFiles = [dependsFile];
+        } else if (Array.isArray(dependsFile)) {
+          if (dependsFile.some(f => typeof f !== 'string')) {
+            throw new Error(`@depends directive array must contain only strings in ${filename}`);
+          }
+          dependsFiles = dependsFile;
+        } else {
+          throw new Error(`@depends directive must be a string or array of strings, got ${typeof dependsFile} in ${filename}`);
         }
 
-        // Check for circular dependencies
-        if (processedDependencies.has(dependsFile)) {
-          throw new Error(`Circular dependency detected: ${dependsFile} is already being processed in the chain starting from ${filename}`);
-        }
+        // Process all dependency files and merge their results
+        let mergedResults: { [key: string]: any } = {};
+        
+        for (const depFile of dependsFiles) {
+          // Check for circular dependencies
+          if (processedDependencies.has(depFile)) {
+            throw new Error(`Circular dependency detected: ${depFile} is already being processed in the chain starting from ${filename}`);
+          }
 
-        // Recursively process the dependent fixture first and return its results
-        return await this.processFixtures(dependsFile, adminApiContext, systemData, new Set(processedDependencies));
+          // Recursively process the dependent fixture and merge its results
+          const depResults = await this.processFixtures(depFile, adminApiContext, systemData, new Set(processedDependencies));
+          mergedResults = { ...mergedResults, ...depResults };
+        }
+        
+        return mergedResults;
       }
 
       return {};

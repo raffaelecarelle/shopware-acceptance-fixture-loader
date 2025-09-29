@@ -29,9 +29,16 @@ import { YamlFixtureLoader, YamlFixtureProcessor } from '@raffaelecarelle/shopwa
 const loader = new YamlFixtureLoader('./fixtures');
 const processor = new YamlFixtureProcessor('./fixtures');
 
-// Load and process fixtures
+// Load and process fixtures - single file
 const results = await processor.processFixtures(
     'customers.yml',
+    adminApiContext,
+    { salutation_id: 'some-uuid' }
+);
+
+// Load and process multiple fixtures - array of files
+const multiResults = await processor.processFixtures(
+    ['customers.yml', 'products.yml', 'orders.yml'],
     adminApiContext,
     { salutation_id: 'some-uuid' }
 );
@@ -96,7 +103,7 @@ new YamlFixtureProcessor(fixturesDir: string)
 
 #### Methods
 
-- `processFixtures(filename: string, adminApiContext: any, systemData?: object): Promise<object>` - Process fixtures with Shopware API
+- `processFixtures(filename: string | string[], adminApiContext: any, systemData?: object): Promise<object>` - Process single fixture file or array of fixture files with Shopware API
 - `cleanup(adminApiContext: any): Promise<void>` - Clean up created entities
 
 ### CircularReferenceResolver
@@ -141,12 +148,13 @@ vat_number: "{faker.vatNumber}" # Italian VAT number
 
 ## Advanced Features
 
-### @include Directive
+### @includes Directive
 
-Reuse and merge fixture data from other YAML files using the `@include` directive at the top of your file:
+Reuse and merge fixture data from other YAML files using the `@includes` directive at the top of your file:
 
+**Single file include:**
 ```yaml
-'@include': 'base_users.yml'
+'@includes': 'base_users.yml'
 fixtures:
   custom_user:
     entity: customer
@@ -162,6 +170,21 @@ fixtures:
       role: "super_admin"
 ```
 
+**Multiple files include (array):**
+```yaml
+'@includes': 
+  - 'base_users.yml'
+  - 'base_products.yml'
+  - 'shared_settings.yml'
+fixtures:
+  custom_user:
+    entity: customer
+    data:
+      firstName: "Custom"
+      lastName: "User"
+      email: "custom@example.com"
+```
+
 **Key features:**
 - Current file data overrides included file data when fixture names match
 - Supports nested includes (included files can also include other files)
@@ -172,8 +195,26 @@ fixtures:
 
 Ensure fixtures are processed in the correct order using the `@depends` directive:
 
+**Single dependency:**
 ```yaml
 '@depends': 'customers.yml'
+fixtures:
+  order_1:
+    entity: order
+    data:
+      customerId: "@customer_1"
+      orderDate: "{faker.date.recent}"
+      items:
+        - productId: "@product_1"
+          quantity: 2
+```
+
+**Multiple dependencies (array):**
+```yaml
+'@depends': 
+  - 'customers.yml'
+  - 'products.yml'
+  - 'categories.yml'
 fixtures:
   order_1:
     entity: order
@@ -197,7 +238,7 @@ You can use both directives in the same file:
 
 ```yaml
 '@depends': 'base_entities.yml'  # Process dependencies first
-'@include': 'shared_data.yml'    # Then merge shared fixture data
+'@includes': 'shared_data.yml'    # Then merge shared fixture data
 fixtures:
   my_entity:
     entity: custom_entity

@@ -137,6 +137,71 @@ describe('YamlFixtureProcessor (public API only)', () => {
             expect(result.customer1).toBeDefined();
             expect(mockAdminApiContext.post).toHaveBeenCalled();
         });
+
+        it('should process fixtures from array of files', async () => {
+            const mockFixtures1 = {
+                customer1: {
+                    entity: 'customer',
+                    count: 1,
+                    data: {
+                        firstName: 'John',
+                        lastName: 'Doe',
+                        email: 'john@example.com'
+                    }
+                }
+            };
+
+            const mockFixtures2 = {
+                product1: {
+                    entity: 'product',
+                    count: 1,
+                    data: {
+                        name: 'Test Product',
+                        price: 100
+                    }
+                }
+            };
+
+            // Mock loadFixtures to return different fixtures based on filename
+            mockLoader.loadFixtures.mockImplementation((filename: string) => {
+                if (filename === 'customers.yml') {
+                    return { fixtures: mockFixtures1 };
+                } else if (filename === 'products.yml') {
+                    return { fixtures: mockFixtures2 };
+                }
+                return { fixtures: {} };
+            });
+
+            // Mock processFixtureData to return processed data
+            mockLoader.processFixtureData.mockImplementation((data: any) => data);
+
+            // Update resolver mock to handle both entities
+            mockResolver.createProcessingPlan.mockReturnValue([
+                {
+                    name: 'customer1',
+                    fixture: mockFixtures1.customer1,
+                    entity: { id: 'customer-id', name: 'Customer' },
+                    phase: 'initial',
+                    deferredFields: new Set()
+                },
+                {
+                    name: 'product1',
+                    fixture: mockFixtures2.product1,
+                    entity: { id: 'product-id', name: 'Product' },
+                    phase: 'initial',
+                    deferredFields: new Set()
+                }
+            ]);
+
+            const result = await processor.processFixtures(['customers.yml', 'products.yml'], mockAdminApiContext, mockSystemData);
+
+            expect(result).toBeDefined();
+            expect(result.customer1).toBeDefined();
+            expect(result.product1).toBeDefined();
+            // Array processing calls processFixtures recursively for each file,
+            // which may result in multiple API calls per file due to dependency processing
+            expect(mockAdminApiContext.post).toHaveBeenCalledTimes(4);
+        });
     });
 
     describe('cleanup', () => {
