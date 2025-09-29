@@ -122,7 +122,7 @@ product1:
             expect(typeof processedCustomer.firstName).toBe('string');
             expect(processedCustomer.firstName.length).toBeGreaterThan(0);
             expect(typeof processedCustomer.email).toBe('string');
-            expect(processedCustomer.email).toMatch(/^[\w\.-]+@[\w\.-]+\.\w+$/);
+            expect(processedCustomer.email).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);
 
             // Verify Italian tax/VAT number format
             expect(processedCustomer.profile.taxNumber).toMatch(/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z0-9]{4}$/);

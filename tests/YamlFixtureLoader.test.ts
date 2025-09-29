@@ -139,7 +139,7 @@ fixtures:
             expect(typeof result.name).toBe('string');
             expect(result.name).not.toBe('{faker.firstName}');
             expect(typeof result.email).toBe('string');
-            expect(result.email).toMatch(/^[\w\.-]+@[\w\.-]+\.\w+$/);
+            expect(result.email).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);
             expect(typeof result.company).toBe('string');
         });
 
@@ -199,7 +199,7 @@ fixtures:
             expect(typeof processedData.name).toBe('string');
             expect(processedData.name).toMatch(/^[A-Za-z]+ [A-Za-z]+$/);
             expect(typeof processedData.email).toBe('string');
-            expect(processedData.email).toMatch(/^[\w\.-]+@[\w\.-]+\.\w+$/);
+            expect(processedData.email).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);
             expect(typeof processedData.company).toBe('string');
             expect(typeof processedData.phone).toBe('string');
         });
@@ -322,8 +322,8 @@ fixtures:
 
             const result = loader.processFixtureData(data, {});
 
-            expect(result.email1).toMatch(/^[\w\.-]+@[\w\.-]+\.\w+$/);
-            expect(result.email2).toMatch(/^[\w\.-]+@[\w\.-]+\.\w+$/);
+            expect(result.email1).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);
+            expect(result.email2).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);
             expect(typeof result.name1).toBe('string');
             expect(typeof result.name2).toBe('string');
             expect(typeof result.uuid).toBe('string');

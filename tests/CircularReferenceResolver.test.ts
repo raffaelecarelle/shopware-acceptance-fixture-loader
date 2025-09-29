@@ -550,7 +550,7 @@ describe('CircularReferenceResolver', () => {
             // Get initial data (should exclude circular references)
             const initialData = plan.map(entity => ({
                 name: entity.name,
-                data: resolver.getInitialData(entity, {})
+                data: resolver.getInitialData(entity)
             }));
 
             // Get deferred updates
