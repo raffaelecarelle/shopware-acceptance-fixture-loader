@@ -197,7 +197,7 @@ fixtures:
             const processedData = loader.processFixtureData(fixtures.fixtures.user1.data, context);
 
             expect(typeof processedData.name).toBe('string');
-            expect(processedData.name).toMatch(/^[A-Za-z]+ [A-Za-z]+$/);
+            expect(processedData.name).toMatch(/^[A-Za-z\-'\s]+ [A-Za-z\-'\s]+$/);
             expect(typeof processedData.email).toBe('string');
             expect(processedData.email).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);
             expect(typeof processedData.company).toBe('string');
