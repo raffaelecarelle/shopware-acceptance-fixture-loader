@@ -190,6 +190,8 @@ fixtures:
 - Supports nested includes (included files can also include other files)
 - Prevents circular includes with clear error messages
 - Merges all fixture data seamlessly
+- **Automatically encompasses @depends** from included files and merges them with current file dependencies
+- **Deduplicates dependencies** to prevent fixtures from being executed multiple times
 
 ### @depends Directive
 

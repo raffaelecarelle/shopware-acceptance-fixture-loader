@@ -87,7 +87,7 @@ export class YamlFixtureLoader {
     // Check for @includes directive
     if (yamlData['@includes']) {
       const includeFile = yamlData['@includes'];
-            
+
       // Support both string and array formats
       let includeFiles: string[];
       if (typeof includeFile === 'string') {
@@ -124,16 +124,51 @@ export class YamlFixtureLoader {
         // Recursively process includes in the included file
         const processedIncludedYaml = await this.processIncludeDirectives(includedYaml, includeFile, new Set(processedFiles));
 
+        // If the included file has @depends, also process those dependencies
+        if (processedIncludedYaml && processedIncludedYaml['@depends']) {
+          const dependsFiles = Array.isArray(processedIncludedYaml['@depends'])
+            ? processedIncludedYaml['@depends']
+            : [processedIncludedYaml['@depends']];
+
+          for (const depFile of dependsFiles) {
+            // Check for circular dependencies
+            if (processedFiles.has(depFile)) {
+              throw new Error(`Circular dependency detected: ${depFile} is already being processed in the chain starting from ${currentFilename}`);
+            }
+
+            // Load and process the dependency file
+            const depFilePath = path.join(this.fixturesDir, depFile);
+            if (fs.existsSync(depFilePath)) {
+              const depContent = fs.readFileSync(depFilePath, 'utf8');
+              const depYaml = yaml.load(depContent) as any;
+              const processedDepYaml = await this.processIncludeDirectives(depYaml, depFile, new Set(processedFiles));
+
+              // Merge dependency fixtures into the included file
+              if (processedDepYaml && processedDepYaml.fixtures) {
+                if (!processedIncludedYaml.fixtures) {
+                  processedIncludedYaml.fixtures = {};
+                }
+                // Add dependency fixtures (don't override existing fixtures)
+                Object.keys(processedDepYaml.fixtures).forEach(fixtureName => {
+                  if (!processedIncludedYaml.fixtures[fixtureName]) {
+                    processedIncludedYaml.fixtures[fixtureName] = processedDepYaml.fixtures[fixtureName];
+                  }
+                });
+              }
+            }
+          }
+        }
+
         // Merge the included data with current merged data
         if (processedIncludedYaml) {
           if (processedIncludedYaml.fixtures) {
             // Deep merge fixtures section - current file data overrides included data
             const includedFixtures = processedIncludedYaml.fixtures;
             const currentFixtures = mergedData.fixtures || {};
-            
+
             // Start with included fixtures as base
             const mergedFixtures: any = { ...includedFixtures };
-            
+
             // Deep merge each fixture that exists in both files
             Object.keys(currentFixtures).forEach(fixtureName => {
               if (includedFixtures[fixtureName]) {
@@ -142,7 +177,7 @@ export class YamlFixtureLoader {
                   ...includedFixtures[fixtureName],
                   ...currentFixtures[fixtureName]
                 };
-                
+
                 // Special handling for the 'data' property - deep merge it
                 if (includedFixtures[fixtureName].data && currentFixtures[fixtureName].data) {
                   mergedFixtures[fixtureName].data = {
@@ -155,13 +190,18 @@ export class YamlFixtureLoader {
                 mergedFixtures[fixtureName] = currentFixtures[fixtureName];
               }
             });
-            
+
             mergedData.fixtures = mergedFixtures;
-            
+
             // Merge other properties at root level from included file
             Object.keys(processedIncludedYaml).forEach(key => {
               if (key !== 'fixtures') {
-                mergedData[key] = processedIncludedYaml[key];
+                if (key === '@depends') {
+                  // Special handling for @depends - merge and deduplicate
+                  mergedData[key] = this.mergeDependencies(mergedData[key], processedIncludedYaml[key]);
+                } else {
+                  mergedData[key] = processedIncludedYaml[key];
+                }
               }
             });
           } else {
@@ -170,10 +210,10 @@ export class YamlFixtureLoader {
               if (key === 'fixtures') {
                 const includedFixtures = processedIncludedYaml[key];
                 const currentFixtures = mergedData.fixtures || {};
-                
+
                 // Start with included fixtures as base
                 const mergedFixtures: any = { ...includedFixtures };
-                
+
                 // Deep merge each fixture that exists in both files
                 Object.keys(currentFixtures).forEach(fixtureName => {
                   if (includedFixtures[fixtureName]) {
@@ -182,7 +222,7 @@ export class YamlFixtureLoader {
                       ...includedFixtures[fixtureName],
                       ...currentFixtures[fixtureName]
                     };
-                    
+
                     // Special handling for the 'data' property - deep merge it
                     if (includedFixtures[fixtureName].data && currentFixtures[fixtureName].data) {
                       mergedFixtures[fixtureName].data = {
@@ -195,8 +235,11 @@ export class YamlFixtureLoader {
                     mergedFixtures[fixtureName] = currentFixtures[fixtureName];
                   }
                 });
-                
+
                 mergedData.fixtures = mergedFixtures;
+              } else if (key === '@depends') {
+                // Special handling for @depends - merge and deduplicate
+                mergedData[key] = this.mergeDependencies(mergedData[key], processedIncludedYaml[key]);
               } else {
                 mergedData[key] = processedIncludedYaml[key];
               }
@@ -209,6 +252,36 @@ export class YamlFixtureLoader {
     }
 
     return yamlData;
+  }
+
+  /**
+     * Merge @depends directives from multiple sources with deduplication
+     */
+  private mergeDependencies(currentDepends: any, includedDepends: any): string | string[] {
+    // Convert both to arrays for easier processing
+    const currentArray: string[] = currentDepends
+      ? (Array.isArray(currentDepends) ? currentDepends : [currentDepends])
+      : [];
+    const includedArray: string[] = includedDepends
+      ? (Array.isArray(includedDepends) ? includedDepends : [includedDepends])
+      : [];
+
+    // Merge and deduplicate
+    const merged = [...currentArray];
+    for (const dep of includedArray) {
+      if (!merged.includes(dep)) {
+        merged.push(dep);
+      }
+    }
+
+    // Return as string if only one dependency, otherwise return array
+    if (merged.length === 0) {
+      return undefined as any;
+    } else if (merged.length === 1) {
+      return merged[0];
+    } else {
+      return merged;
+    }
   }
 
   /**
@@ -317,11 +390,11 @@ export class YamlFixtureLoader {
     // Parse pattern like "addresses[0].id" or "categories[0]"
     const matchWithProperty = placeholder.match(/^([^[]+)\[(\d+)\]\.(.+)$/);
     const matchSimple = placeholder.match(/^([^[]+)\[(\d+)\]$/);
-        
+
     let arrayName: string;
     let index: number;
     let propertyPath: string | undefined;
-        
+
     if (matchWithProperty) {
       [, arrayName, , propertyPath] = matchWithProperty;
       index = parseInt(matchWithProperty[2], 10);

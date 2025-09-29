@@ -295,10 +295,10 @@ export class YamlFixtureProcessor {
      */
   private async createGenericEntity(entityType: string, data: any, adminApiContext: any): Promise<any> {
     const endpoint = this.getEntityEndpoint(entityType);
+    console.log(endpoint);
     const response = await adminApiContext.post(endpoint, {
       data: data
     });
-
     if (!response.ok()) {
       throw new Error(`Failed to create ${entityType}: ${await response.text()}`);
     }
