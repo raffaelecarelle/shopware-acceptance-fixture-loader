@@ -199,8 +199,8 @@ describe('YamlFixtureProcessor (public API only)', () => {
             expect(result.customer1).toBeDefined();
             expect(result.product1).toBeDefined();
             // Array processing calls processFixtures recursively for each file,
-            // which may result in multiple API calls per file due to dependency processing
-            expect(mockAdminApiContext.post).toHaveBeenCalledTimes(4);
+            // but with proper deduplication, each unique entity should only be created once
+            expect(mockAdminApiContext.post).toHaveBeenCalledTimes(2);
         });
     });
 

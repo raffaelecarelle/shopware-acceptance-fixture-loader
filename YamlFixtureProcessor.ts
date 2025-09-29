@@ -59,6 +59,16 @@ export class YamlFixtureProcessor {
     const processingPlan = resolver.createProcessingPlan(expandedFixtures);
 
     for (const processingEntity of processingPlan) {
+      // Check if this entity has already been created (prevents duplicates)
+      if (this.createdEntities.has(processingEntity.name)) {
+        const existingId = this.createdEntities.get(processingEntity.name);
+        processingEntity.entity = { id: existingId };
+        processingEntity.phase = 'created';
+        results[processingEntity.name] = processingEntity.entity;
+        this.references.set(processingEntity.name, existingId);
+        continue;
+      }
+
       if (processingEntity.fixture.existing) {
         // Handle existing entities
         const entity = await this.findExistingEntity(
@@ -180,9 +190,14 @@ export class YamlFixtureProcessor {
         let mergedResults: { [key: string]: any } = {};
         
         for (const depFile of dependsFiles) {
-          // Check for circular dependencies
+          // Check for circular dependencies using the current processing chain
           if (processedDependencies.has(depFile)) {
             throw new Error(`Circular dependency detected: ${depFile} is already being processed in the chain starting from ${filename}`);
+          }
+
+          // Skip if this dependency has already been completed (avoids duplicate processing)
+          if (completedFiles.has(depFile)) {
+            continue;
           }
 
           // Recursively process the dependent fixture and merge its results
@@ -298,7 +313,7 @@ export class YamlFixtureProcessor {
      */
   private async createGenericEntity(entityType: string, data: any, adminApiContext: any): Promise<any> {
     const endpoint = this.getEntityEndpoint(entityType);
-    console.log(endpoint);
+
     const response = await adminApiContext.post(endpoint, {
       data: data
     });

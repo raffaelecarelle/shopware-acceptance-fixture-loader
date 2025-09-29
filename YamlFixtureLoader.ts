@@ -144,8 +144,29 @@ export class YamlFixtureLoader {
             // Mark this dependency as processed
             processedDependencies.add(depFile);
 
-            // Don't process dependency fixtures here - let YamlFixtureProcessor handle them
-            // This prevents duplicate entity creation
+            // Load and merge the dependency file fixtures
+            const depFilePath = path.join(this.fixturesDir, depFile);
+            if (fs.existsSync(depFilePath)) {
+              const depContent = fs.readFileSync(depFilePath, 'utf8');
+              const depYaml = yaml.load(depContent) as any;
+              
+              // Recursively process the dependency file
+              const processedDepYaml = await this.processIncludeDirectives(depYaml, depFile, new Set(processedFiles), processedDependencies);
+              
+              // Merge dependency fixtures into current merged data
+              if (processedDepYaml && processedDepYaml.fixtures) {
+                if (!mergedData.fixtures) {
+                  mergedData.fixtures = {};
+                }
+                
+                // Merge dependency fixtures (don't override existing fixtures)
+                Object.keys(processedDepYaml.fixtures).forEach(fixtureName => {
+                  if (!mergedData.fixtures[fixtureName]) {
+                    mergedData.fixtures[fixtureName] = processedDepYaml.fixtures[fixtureName];
+                  }
+                });
+              }
+            }
           }
         }
 
