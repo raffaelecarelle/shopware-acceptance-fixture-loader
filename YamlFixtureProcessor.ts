@@ -59,6 +59,7 @@ export class YamlFixtureProcessor {
                 processingEntity.phase = 'created';
                 results[processingEntity.name] = entity;
                 this.references.set(processingEntity.name, entity.id);
+                this.createdEntities.set(processingEntity.name, entity.id);
             } else {
                 // Create new entities with initial data (excluding circular references)
                 const context = {references: Object.fromEntries(this.references), data: {}};
@@ -217,12 +218,12 @@ export class YamlFixtureProcessor {
         // Cleanup in reverse order
         const entities = Array.from(this.createdEntities.entries()).reverse();
 
-        for (const [name, entity] of entities) {
+        for (const [name, entityId] of entities) {
             try {
                 // Determine cleanup endpoint based on entity type
                 const endpoint = this.getCleanupEndpoint(name);
-                if (endpoint && entity.id) {
-                    await adminApiContext.delete(`${endpoint}/${entity.id}`);
+                if (endpoint && entityId) {
+                    await adminApiContext.delete(`${endpoint}/${entityId}`);
                 }
             } catch (error) {
                 console.warn(`Failed to cleanup fixture ${name}:`, error);

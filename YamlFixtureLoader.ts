@@ -43,12 +43,20 @@ export class YamlFixtureLoader {
 
         try {
             const fileContent = fs.readFileSync(filePath, 'utf8');
-            const parsedYaml = yaml.load(fileContent) as YamlFixtureConfig;
+            const parsedYaml = yaml.load(fileContent) as any;
+
+            // If the parsed YAML doesn't have a fixtures property, wrap it
+            let config: YamlFixtureConfig;
+            if (parsedYaml && typeof parsedYaml === 'object' && !parsedYaml.fixtures) {
+                config = { fixtures: parsedYaml };
+            } else {
+                config = parsedYaml as YamlFixtureConfig;
+            }
 
             // Cache the parsed fixtures
-            this.fixturesCache.set(cacheKey, parsedYaml);
+            this.fixturesCache.set(cacheKey, config);
 
-            return parsedYaml;
+            return config;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to parse YAML fixture file ${filename}: ${errorMessage}`);
@@ -107,18 +115,27 @@ export class YamlFixtureLoader {
 
         // Handle placeholders like {faker.email} or {env.BASE_URL}
         if (value.includes('{') && value.includes('}')) {
-            return value.replace(/\{([^}]+)\}/g, (match, placeholder) => {
-                return this.resolvePlaceholder(placeholder, context);
-            });
+            // Check if the entire string is a single placeholder
+            const singlePlaceholderMatch = value.match(/^\{([^}]+)\}$/);
+            if (singlePlaceholderMatch) {
+                // Return the resolved value directly (could be object, array, etc.)
+                return this.resolvePlaceholder(singlePlaceholderMatch[1], context);
+            } else {
+                // Multiple placeholders or mixed content - do string replacement
+                return value.replace(/\{([^}]+)\}/g, (match, placeholder) => {
+                    const resolved = this.resolvePlaceholder(placeholder, context);
+                    return typeof resolved === 'object' ? JSON.stringify(resolved) : resolved;
+                });
+            }
         }
 
         return value;
     }
 
-    private resolvePlaceholder(placeholder: string, context: any): string {
-        const parts = placeholder.split('.');
+    private resolvePlaceholder(placeholder: string, context: any): any {
+        const parts = placeholder.split(/[:.]/);
 
-        if (parts[0] === 'faker') {
+        if (parts[0] === 'faker' || parts[0] === 'fake') {
             // Simple faker integration - can be extended
             return this.generateFakeData(parts.slice(1).join('.'));
         }
@@ -128,7 +145,8 @@ export class YamlFixtureLoader {
         }
 
         if (parts[0] === 'context' && context.data) {
-            return this.getNestedValue(context.data, parts.slice(1));
+            const value = this.getNestedValue(context.data, parts.slice(1));
+            return value === undefined ? 'undefined' : value;
         }
 
         // Handle nested array references like addresses[0].id
@@ -136,27 +154,57 @@ export class YamlFixtureLoader {
             return this.resolveArrayReference(placeholder, context);
         }
 
+        // Handle direct array references like "tags" or "categories"
+        if (context[placeholder] && Array.isArray(context[placeholder])) {
+            return context[placeholder];
+        }
+
         return placeholder;
     }
 
     /**
-     * Resolves array references like "addresses[0].id" within the current data context
+     * Resolves array references like "addresses[0].id" or "categories[0]" within the current data context
      */
-    private resolveArrayReference(placeholder: string, context: any): string {
-        // Parse pattern like "addresses[0].id"
-        const match = placeholder.match(/^([^[]+)\[(\d+)\]\.(.+)$/);
-        if (!match) {
+    private resolveArrayReference(placeholder: string, context: any): any {
+        // Parse pattern like "addresses[0].id" or "categories[0]"
+        const matchWithProperty = placeholder.match(/^([^[]+)\[(\d+)\]\.(.+)$/);
+        const matchSimple = placeholder.match(/^([^[]+)\[(\d+)\]$/);
+        
+        let arrayName: string;
+        let index: number;
+        let propertyPath: string | undefined;
+        
+        if (matchWithProperty) {
+            [, arrayName, , propertyPath] = matchWithProperty;
+            index = parseInt(matchWithProperty[2], 10);
+        } else if (matchSimple) {
+            [, arrayName] = matchSimple;
+            index = parseInt(matchSimple[2], 10);
+        } else {
             return placeholder;
         }
 
-        const [, arrayName, indexStr, propertyPath] = match;
-        const index = parseInt(indexStr, 10);
+        // Try to resolve from root context first
+        if (context[arrayName] && Array.isArray(context[arrayName])) {
+            const arrayItem = context[arrayName][index];
+            if (arrayItem !== undefined) {
+                if (propertyPath) {
+                    return this.getNestedValue(arrayItem, propertyPath.split('.'));
+                } else {
+                    return arrayItem;
+                }
+            }
+        }
 
         // Try to resolve from current data being processed
         if (context.currentData && context.currentData[arrayName] && Array.isArray(context.currentData[arrayName])) {
             const arrayItem = context.currentData[arrayName][index];
-            if (arrayItem) {
-                return this.getNestedValue(arrayItem, propertyPath.split('.'));
+            if (arrayItem !== undefined) {
+                if (propertyPath) {
+                    return this.getNestedValue(arrayItem, propertyPath.split('.'));
+                } else {
+                    return arrayItem;
+                }
             }
         }
 
@@ -190,17 +238,20 @@ export class YamlFixtureLoader {
             case 'company':
             case 'company.name':
                 return faker.company.name();
+            case 'jobTitle':
             case 'job_title':
             case 'person.jobTitle':
                 return faker.person.jobTitle();
 
             // Address data
+            case 'address':
             case 'street':
             case 'location.streetAddress':
                 return faker.location.streetAddress();
             case 'city':
             case 'location.city':
                 return faker.location.city();
+            case 'zipCode':
             case 'zipcode':
             case 'location.zipCode':
                 return faker.location.zipCode();
@@ -240,6 +291,11 @@ export class YamlFixtureLoader {
             case 'price':
                 return faker.commerce.price();
 
+            // Boolean
+            case 'boolean':
+            case 'datatype.boolean':
+                return faker.datatype.boolean();
+
             // Date and time
             case 'date':
             case 'date.recent':
@@ -247,6 +303,7 @@ export class YamlFixtureLoader {
             case 'date_past':
             case 'date.past':
                 return faker.date.past().toISOString();
+            case 'futureDate':
             case 'date_future':
             case 'date.future':
                 return faker.date.future().toISOString();
@@ -291,8 +348,10 @@ export class YamlFixtureLoader {
                 return faker.finance.creditCardNumber();
 
             // Italian specific data
+            case 'italianTaxNumber':
             case 'it_tax_number':
                 return this.generateItalianTaxNumber();
+            case 'italianVATNumber':
             case 'it_vat_number':
                 return this.generateItalianVATNumber();
             case 'it_postal_code':
@@ -330,15 +389,10 @@ export class YamlFixtureLoader {
         taxNumber += numbers[Math.floor(Math.random() * numbers.length)];
         taxNumber += numbers[Math.floor(Math.random() * numbers.length)];
 
-        // 4 caratteri per il comune e controllo
+        // 4 caratteri alfanumerici finali (codice comune + controllo)
+        const alphanumeric = letters + numbers;
         for (let i = 0; i < 4; i++) {
-            if (i < 3) {
-                taxNumber += letters[Math.floor(Math.random() * letters.length)];
-            } else {
-                taxNumber += Math.random() > 0.5 ?
-                    letters[Math.floor(Math.random() * letters.length)] :
-                    numbers[Math.floor(Math.random() * numbers.length)];
-            }
+            taxNumber += alphanumeric[Math.floor(Math.random() * alphanumeric.length)];
         }
 
         return taxNumber;
@@ -348,7 +402,7 @@ export class YamlFixtureLoader {
      * Genera una partita IVA italiana fittizia
      */
     private generateItalianVATNumber(): string {
-        // Partita IVA italiana: 11 cifre
+        // Partita IVA italiana: IT + 11 cifre
         let vatNumber = 'IT';
         for (let i = 0; i < 11; i++) {
             vatNumber += Math.floor(Math.random() * 10).toString();

@@ -327,7 +327,7 @@ fixtures:
             expect(typeof result.name1).toBe('string');
             expect(typeof result.name2).toBe('string');
             expect(typeof result.uuid).toBe('string');
-            expect(typeof result.number).toBe('string'); // faker.number ritorna string nella tua implementazione
+            expect(typeof result.number).toBe('number'); // faker.number ritorna number
             expect(typeof result.date).toBe('string');
             expect(typeof result.company).toBe('string');
             expect(typeof result.phone).toBe('string');
