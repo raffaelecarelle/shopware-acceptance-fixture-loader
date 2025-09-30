@@ -86,7 +86,8 @@ export default [
       'node_modules/**',
       'coverage/**',
       '*.js',
-      'eslint.config.js'
+      'eslint.config.js',
+      'eslint.config.mjs'
     ]
   }
 ];
