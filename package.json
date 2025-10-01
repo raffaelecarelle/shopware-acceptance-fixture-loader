@@ -9,6 +9,10 @@
         "dist/**/*",
         "README.md"
     ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/raffaelecarelle/shopware-acceptance-fixture-loader"
+    },
     "scripts": {
         "build": "tsc",
         "prepublishOnly": "npm run build",
