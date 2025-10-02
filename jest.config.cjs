@@ -1,13 +1,28 @@
 module.exports = {
-  preset: 'ts-jest',
+  preset: 'ts-jest/presets/default-esm',
+  extensionsToTreatAsEsm: ['.ts'],
   testEnvironment: 'node',
   roots: ['<rootDir>'],
   testMatch: [
     '<rootDir>/tests/**/*.test.ts'
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest'
+    '^.+\\.ts$': ['ts-jest', {
+      useESM: true,
+      tsconfig: {
+        module: 'ESNext'
+      }
+    }],
+    '^.+\\.js$': ['ts-jest', {
+      useESM: true
+    }]
   },
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1'
+  },
+  transformIgnorePatterns: [
+    'node_modules/(?!((@faker-js|@shopware)/.*|.*\\.mjs$))'
+  ],
   collectCoverageFrom: [
     '*.ts',
     '!**/*.d.ts',
