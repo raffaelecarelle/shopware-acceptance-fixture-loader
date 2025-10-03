@@ -4,7 +4,7 @@ import * as path from 'path';
 
 // Mock console methods for cleaner test output
 global.console = {
-  ...console,
+  ...console
   // Uncomment the line below to suppress console.log during tests
   // log: jest.fn(),
 };

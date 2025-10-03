@@ -1,34 +1,34 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {YamlFixtureLoader} from '../src/YamlFixtureLoader';
-import {CircularReferenceResolver} from '../src/CircularReferenceResolver';
-import {YamlFixtureProcessor} from '../src/YamlFixtureProcessor';
-import {TEST_FIXTURES_DIR} from './setup';
+import { YamlFixtureLoader } from '../src/YamlFixtureLoader';
+import { CircularReferenceResolver } from '../src/CircularReferenceResolver';
+import { YamlFixtureProcessor } from '../src/YamlFixtureProcessor';
+import { TEST_FIXTURES_DIR } from './setup';
 
 describe('Integration Tests', () => {
-    let testFixturesDir: string;
-    let loader: YamlFixtureLoader;
-    let processor: YamlFixtureProcessor;
+  let testFixturesDir: string;
+  let loader: YamlFixtureLoader;
+  let processor: YamlFixtureProcessor;
 
-    beforeEach(() => {
-        testFixturesDir = path.join(TEST_FIXTURES_DIR, 'integration');
-        if (!fs.existsSync(testFixturesDir)) {
-            fs.mkdirSync(testFixturesDir, {recursive: true});
-        }
-        loader = new YamlFixtureLoader(testFixturesDir);
-        processor = new YamlFixtureProcessor(testFixturesDir);
-    });
+  beforeEach(() => {
+    testFixturesDir = path.join(TEST_FIXTURES_DIR, 'integration');
+    if (!fs.existsSync(testFixturesDir)) {
+      fs.mkdirSync(testFixturesDir, { recursive: true });
+    }
+    loader = new YamlFixtureLoader(testFixturesDir);
+    processor = new YamlFixtureProcessor(testFixturesDir);
+  });
 
-    afterEach(() => {
-        if (fs.existsSync(testFixturesDir)) {
-            fs.rmSync(testFixturesDir, {recursive: true, force: true});
-        }
-    });
+  afterEach(() => {
+    if (fs.existsSync(testFixturesDir)) {
+      fs.rmSync(testFixturesDir, { recursive: true, force: true });
+    }
+  });
 
-    describe('YamlFixtureLoader + CircularReferenceResolver Integration', () => {
-        it('should handle circular references between entities', async () => {
-            // Create test YAML with circular references
-            const yamlContent = `
+  describe('YamlFixtureLoader + CircularReferenceResolver Integration', () => {
+    it('should handle circular references between entities', async () => {
+      // Create test YAML with circular references
+      const yamlContent = `
 user1:
   entity: 'user'  
   data:
@@ -44,40 +44,40 @@ user2:
     bestFriendId: "@user1"
       `;
 
-            const testFile = path.join(testFixturesDir, 'circular.yml');
-            fs.writeFileSync(testFile, yamlContent);
+      const testFile = path.join(testFixturesDir, 'circular.yml');
+      fs.writeFileSync(testFile, yamlContent);
 
-            // Load fixtures
-            const fixtureConfig = await loader.loadFixtures('circular.yml');
-            const fixtures = fixtureConfig.fixtures;
-            expect(Object.keys(fixtures)).toHaveLength(2);
+      // Load fixtures
+      const fixtureConfig = await loader.loadFixtures('circular.yml');
+      const fixtures = fixtureConfig.fixtures;
+      expect(Object.keys(fixtures)).toHaveLength(2);
 
-            // Set up circular reference resolver
-            const references = new Map<string, any>();
-            const resolver = new CircularReferenceResolver(references);
+      // Set up circular reference resolver
+      const references = new Map<string, any>();
+      const resolver = new CircularReferenceResolver(references);
 
-            // Create processing plan
-            const plan = resolver.createProcessingPlan(fixtures);
-            expect(plan).toHaveLength(2);
+      // Create processing plan
+      const plan = resolver.createProcessingPlan(fixtures);
+      expect(plan).toHaveLength(2);
 
-            // Verify circular references are detected
-            const deferredCount = plan.reduce((sum, entity) => sum + entity.deferredFields.size, 0);
-            expect(deferredCount).toBeGreaterThan(0);
+      // Verify circular references are detected
+      const deferredCount = plan.reduce((sum, entity) => sum + entity.deferredFields.size, 0);
+      expect(deferredCount).toBeGreaterThan(0);
 
-            // Simulate entity creation and reference resolution
-            references.set('user1', {id: 'user1-id', name: 'John Doe'});
-            references.set('user2', {id: 'user2-id', name: 'Jane Smith'});
+      // Simulate entity creation and reference resolution
+      references.set('user1', { id: 'user1-id', name: 'John Doe' });
+      references.set('user2', { id: 'user2-id', name: 'Jane Smith' });
 
-            // Test deferred updates
-            const entityWithDeferred = plan.find(e => e.deferredFields.size > 0);
-            if (entityWithDeferred) {
-                const deferredUpdates = resolver.getDeferredUpdates(entityWithDeferred);
-                expect(Object.keys(deferredUpdates).length).toBeGreaterThan(0);
-            }
-        });
+      // Test deferred updates
+      const entityWithDeferred = plan.find(e => e.deferredFields.size > 0);
+      if (entityWithDeferred) {
+        const deferredUpdates = resolver.getDeferredUpdates(entityWithDeferred);
+        expect(Object.keys(deferredUpdates).length).toBeGreaterThan(0);
+      }
+    });
 
-        it('should process complex fixture with placeholders and fake data', async () => {
-            const yamlContent = `
+    it('should process complex fixture with placeholders and fake data', async () => {
+      const yamlContent = `
 customer1:
   entity: 'customer'
   data:
@@ -107,38 +107,38 @@ product1:
     description: "High quality product from {fake:company}"
       `;
 
-            const testFile = path.join(testFixturesDir, 'complex.yml');
-            fs.writeFileSync(testFile, yamlContent);
+      const testFile = path.join(testFixturesDir, 'complex.yml');
+      fs.writeFileSync(testFile, yamlContent);
 
-            const fixtureConfig = await loader.loadFixtures('complex.yml');
-            const fixtures = fixtureConfig.fixtures;
+      const fixtureConfig = await loader.loadFixtures('complex.yml');
+      const fixtures = fixtureConfig.fixtures;
 
-            // Process fixture data with context
-            const context = {systemData: {}};
-            const processedCustomer = loader.processFixtureData(fixtures.customer1.data, context);
-            const processedProduct = loader.processFixtureData(fixtures.product1.data, context);
+      // Process fixture data with context
+      const context = { systemData: {} };
+      const processedCustomer = loader.processFixtureData(fixtures.customer1.data, context);
+      const processedProduct = loader.processFixtureData(fixtures.product1.data, context);
 
-            // Verify fake data generation
-            expect(typeof processedCustomer.firstName).toBe('string');
-            expect(processedCustomer.firstName.length).toBeGreaterThan(0);
-            expect(typeof processedCustomer.email).toBe('string');
-            expect(processedCustomer.email).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);
+      // Verify fake data generation
+      expect(typeof processedCustomer.firstName).toBe('string');
+      expect(processedCustomer.firstName.length).toBeGreaterThan(0);
+      expect(typeof processedCustomer.email).toBe('string');
+      expect(processedCustomer.email).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);
 
-            // Verify Italian tax/VAT number format
-            expect(processedCustomer.profile.taxNumber).toMatch(/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z0-9]{4}$/);
-            expect(processedCustomer.profile.vatNumber).toMatch(/^IT\d{11}$/);
+      // Verify Italian tax/VAT number format
+      expect(processedCustomer.profile.taxNumber).toMatch(/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z0-9]{4}$/);
+      expect(processedCustomer.profile.vatNumber).toMatch(/^IT\d{11}$/);
 
-            // Verify nested processing
-            expect(typeof processedCustomer.address.city).toBe('string');
-            expect(processedCustomer.address.city.length).toBeGreaterThan(0);
+      // Verify nested processing
+      expect(typeof processedCustomer.address.city).toBe('string');
+      expect(processedCustomer.address.city.length).toBeGreaterThan(0);
 
-            // Verify different data types
-            expect(typeof processedProduct.price).toBe('number');
-            expect(typeof processedProduct.active).toBe('boolean');
-        });
+      // Verify different data types
+      expect(typeof processedProduct.price).toBe('number');
+      expect(typeof processedProduct.active).toBe('boolean');
+    });
 
-        it('should handle array references and nested object resolution', async () => {
-            const yamlContent = `
+    it('should handle array references and nested object resolution', async () => {
+      const yamlContent = `
 categories:
   - name: "Electronics"
   - name: "Books"
@@ -162,41 +162,41 @@ product1:
       description: "Product in {categories[0].name} category with {tags[0].name} tag"
       `;
 
-            const testFile = path.join(testFixturesDir, 'arrays.yml');
-            fs.writeFileSync(testFile, yamlContent);
+      const testFile = path.join(testFixturesDir, 'arrays.yml');
+      fs.writeFileSync(testFile, yamlContent);
 
-            const fixtureConfig = await loader.loadFixtures('arrays.yml');
-            const fixtures = fixtureConfig.fixtures;
+      const fixtureConfig = await loader.loadFixtures('arrays.yml');
+      const fixtures = fixtureConfig.fixtures;
 
-            const context = {
-                categories: [
-                    {name: 'Electronics'},
-                    {name: 'Books'},
-                    {name: 'Clothing'}
-                ],
-                tags: [
-                    {name: 'Popular'},
-                    {name: 'New'}
-                ]
-            };
+      const context = {
+        categories: [
+          { name: 'Electronics' },
+          { name: 'Books' },
+          { name: 'Clothing' }
+        ],
+        tags: [
+          { name: 'Popular' },
+          { name: 'New' }
+        ]
+      };
 
-            const processedProduct = loader.processFixtureData(fixtures.product1.data, context);
+      const processedProduct = loader.processFixtureData(fixtures.product1.data, context);
 
-            expect(processedProduct.categoryName).toBe('Electronics');
-            expect(processedProduct.primaryTag).toBe('Popular');
-            expect(processedProduct.secondaryTag).toBe('New');
-            expect(processedProduct.metadata.category).toEqual({name: 'Electronics'});
-            expect(processedProduct.metadata.allTags).toEqual([
-                {name: 'Popular'},
-                {name: 'New'}
-            ]);
-            expect(processedProduct.metadata.description).toBe('Product in Electronics category with Popular tag');
-        });
+      expect(processedProduct.categoryName).toBe('Electronics');
+      expect(processedProduct.primaryTag).toBe('Popular');
+      expect(processedProduct.secondaryTag).toBe('New');
+      expect(processedProduct.metadata.category).toEqual({ name: 'Electronics' });
+      expect(processedProduct.metadata.allTags).toEqual([
+        { name: 'Popular' },
+        { name: 'New' }
+      ]);
+      expect(processedProduct.metadata.description).toBe('Product in Electronics category with Popular tag');
     });
+  });
 
-    describe('Full Workflow Integration', () => {
-        it('should handle complete fixture processing with all components', async () => {
-            const yamlContent = `
+  describe('Full Workflow Integration', () => {
+    it('should handle complete fixture processing with all components', async () => {
+      const yamlContent = `
 customer1:
   entity: 'customer'
   existing: true
@@ -236,103 +236,103 @@ orderLineItem1_{1...2}:
     price: "{{fake:number}}"
       `;
 
-            const testFile = path.join(testFixturesDir, 'workflow.yml');
-            fs.writeFileSync(testFile, yamlContent);
+      const testFile = path.join(testFixturesDir, 'workflow.yml');
+      fs.writeFileSync(testFile, yamlContent);
 
-            // Mock admin API context
-            const mockAdminApiContext = {
-                get: jest.fn().mockResolvedValue({
-                    data: [{id: 'customer-123', email: 'john@example.com', firstName: 'John', lastName: 'Doe'}],
-                    ok: () => true,
-                    json: async () => ({data: [{id: 'customer-123', email: 'john@example.com', firstName: 'John', lastName: 'Doe'}]})
-                }), // Return existing customer
-                post: jest.fn().mockImplementation((endpoint, data) => {
-                    const entityData = {
-                        id: `${endpoint}-${Math.random().toString(36).substr(2, 9)}`,
-                        ...data.data
-                    };
-                    return Promise.resolve({
-                        data: entityData,
-                        ok: () => true,
-                        json: async () => ({data: entityData})
-                    });
-                }),
-                patch: jest.fn().mockImplementation((endpoint, data) => {
-                    return Promise.resolve({
-                        data: {
-                            id: endpoint.split('/')[1],
-                            ...data
-                        },
-                        ok: () => true,
-                        json: async () => ({
-                            data: {
-                                id: endpoint.split('/')[1],
-                                ...data
-                            }
-                        })
-                    });
-                })
-            };
+      // Mock admin API context
+      const mockAdminApiContext = {
+        get: jest.fn().mockResolvedValue({
+          data: [{ id: 'customer-123', email: 'john@example.com', firstName: 'John', lastName: 'Doe' }],
+          ok: () => true,
+          json: async () => ({ data: [{ id: 'customer-123', email: 'john@example.com', firstName: 'John', lastName: 'Doe' }] })
+        }), // Return existing customer
+        post: jest.fn().mockImplementation((endpoint, data) => {
+          const entityData = {
+            id: `${endpoint}-${Math.random().toString(36).substr(2, 9)}`,
+            ...data.data
+          };
+          return Promise.resolve({
+            data: entityData,
+            ok: () => true,
+            json: async () => ({ data: entityData })
+          });
+        }),
+        patch: jest.fn().mockImplementation((endpoint, data) => {
+          return Promise.resolve({
+            data: {
+              id: endpoint.split('/')[1],
+              ...data
+            },
+            ok: () => true,
+            json: async () => ({
+              data: {
+                id: endpoint.split('/')[1],
+                ...data
+              }
+            })
+          });
+        })
+      };
 
-            // Mock system data
-            const mockSystemData = {
-                currencies: [{id: 'currency-1', isoCode: 'EUR'}],
-                languages: [{id: 'language-1', locale: {code: 'en-GB'}}]
-            };
+      // Mock system data
+      const mockSystemData = {
+        currencies: [{ id: 'currency-1', isoCode: 'EUR' }],
+        languages: [{ id: 'language-1', locale: { code: 'en-GB' } }]
+      };
 
-            // Process fixtures
-            const result = await processor.processFixtures('workflow.yml', mockAdminApiContext, mockSystemData);
+      // Process fixtures
+      const result = await processor.processFixtures('workflow.yml', mockAdminApiContext, mockSystemData);
 
-            // Verify all entities were created
-            expect(result).toBeDefined();
-            expect(result.customer1).toBeDefined();
-            expect(result.address1).toBeDefined();
-            expect(result.order1).toBeDefined();
-            expect(result.orderLineItem1_1).toBeDefined();
-            expect(result.orderLineItem1_2).toBeDefined();
+      // Verify all entities were created
+      expect(result).toBeDefined();
+      expect(result.customer1).toBeDefined();
+      expect(result.address1).toBeDefined();
+      expect(result.order1).toBeDefined();
+      expect(result.orderLineItem1_1).toBeDefined();
+      expect(result.orderLineItem1_2).toBeDefined();
 
-            // Verify API calls were made
-            expect(mockAdminApiContext.get).toHaveBeenCalled(); // findBy calls
-            expect(mockAdminApiContext.post).toHaveBeenCalled(); // entity creation
-            expect(mockAdminApiContext.patch).toHaveBeenCalled(); // deferred updates
+      // Verify API calls were made
+      expect(mockAdminApiContext.get).toHaveBeenCalled(); // findBy calls
+      expect(mockAdminApiContext.post).toHaveBeenCalled(); // entity creation
+      expect(mockAdminApiContext.patch).toHaveBeenCalled(); // deferred updates
 
-            // Verify entity relationships
-            expect(result.customer1.id).toBeDefined();
-            expect(result.address1.customerId).toBe(result.customer1.id);
-            expect(result.order1.customerId).toBe(result.customer1.id);
-            expect(result.orderLineItem1_1.orderId).toBe(result.order1.id);
-            expect(result.orderLineItem1_2.orderId).toBe(result.order1.id);
-        }, 10000); // Increase timeout for complex test
+      // Verify entity relationships
+      expect(result.customer1.id).toBeDefined();
+      expect(result.address1.customerId).toBe(result.customer1.id);
+      expect(result.order1.customerId).toBe(result.customer1.id);
+      expect(result.orderLineItem1_1.orderId).toBe(result.order1.id);
+      expect(result.orderLineItem1_2.orderId).toBe(result.order1.id);
+    }, 10000); // Increase timeout for complex test
 
-        it('should handle cleanup of created entities', async () => {
-            // This test would verify cleanup functionality
-            // For now, we'll just test that cleanup doesn't throw
-            const mockAdminApiContext = {
-                delete: jest.fn().mockResolvedValue({})
-            };
+    it('should handle cleanup of created entities', async () => {
+      // This test would verify cleanup functionality
+      // For now, we'll just test that cleanup doesn't throw
+      const mockAdminApiContext = {
+        delete: jest.fn().mockResolvedValue({})
+      };
 
-            await expect(processor.cleanup(mockAdminApiContext))
-                .resolves.not.toThrow();
-        });
+      await expect(processor.cleanup(mockAdminApiContext))
+        .resolves.not.toThrow();
     });
+  });
 
-    describe('Error Handling Integration', () => {
-        it('should handle malformed YAML gracefully', async () => {
-            const invalidYamlContent = `
+  describe('Error Handling Integration', () => {
+    it('should handle malformed YAML gracefully', async () => {
+      const invalidYamlContent = `
 invalid yaml content:
   - missing quotes
   - [unclosed bracket
   - invalid: structure: here
       `;
 
-            const testFile = path.join(testFixturesDir, 'invalid.yml');
-            fs.writeFileSync(testFile, invalidYamlContent);
+      const testFile = path.join(testFixturesDir, 'invalid.yml');
+      fs.writeFileSync(testFile, invalidYamlContent);
 
-            await expect(loader.loadFixtures('invalid.yml')).rejects.toThrow();
-        });
+      await expect(loader.loadFixtures('invalid.yml')).rejects.toThrow();
+    });
 
-        it('should handle missing references gracefully', async () => {
-            const yamlContent = `
+    it('should handle missing references gracefully', async () => {
+      const yamlContent = `
 order1:
   data:
     entity: "order"
@@ -340,19 +340,19 @@ order1:
     orderNumber: "ORDER-001"
       `;
 
-            const testFile = path.join(testFixturesDir, 'missing-refs.yml');
-            fs.writeFileSync(testFile, yamlContent);
+      const testFile = path.join(testFixturesDir, 'missing-refs.yml');
+      fs.writeFileSync(testFile, yamlContent);
 
-            const fixtureConfig = await loader.loadFixtures('missing-refs.yml');
-            const fixtures = fixtureConfig.fixtures;
-            const processedData = loader.processFixtureData(fixtures.order1.data, {});
+      const fixtureConfig = await loader.loadFixtures('missing-refs.yml');
+      const fixtures = fixtureConfig.fixtures;
+      const processedData = loader.processFixtureData(fixtures.order1.data, {});
 
-            // Should keep placeholder as-is when reference is missing
-            expect(processedData.customerId).toBe('@nonexistentCustomer');
-        });
+      // Should keep placeholder as-is when reference is missing
+      expect(processedData.customerId).toBe('@nonexistentCustomer');
+    });
 
-        it('should handle deeply nested circular references', async () => {
-            const yamlContent = `
+    it('should handle deeply nested circular references', async () => {
+      const yamlContent = `
 user1:
   entity: "user"
   data:
@@ -381,63 +381,63 @@ user3:
         secondary: "@user2"
       `;
 
-            const testFile = path.join(testFixturesDir, 'deep-circular.yml');
-            fs.writeFileSync(testFile, yamlContent);
+      const testFile = path.join(testFixturesDir, 'deep-circular.yml');
+      fs.writeFileSync(testFile, yamlContent);
 
-            const fixtureConfig = await loader.loadFixtures('deep-circular.yml');
-            const fixtures = fixtureConfig.fixtures;
-            const references = new Map<string, any>();
-            const resolver = new CircularReferenceResolver(references);
+      const fixtureConfig = await loader.loadFixtures('deep-circular.yml');
+      const fixtures = fixtureConfig.fixtures;
+      const references = new Map<string, any>();
+      const resolver = new CircularReferenceResolver(references);
 
-            const plan = resolver.createProcessingPlan(fixtures);
+      const plan = resolver.createProcessingPlan(fixtures);
 
-            expect(plan).toHaveLength(3);
+      expect(plan).toHaveLength(3);
 
-            // Should detect circular references in nested structures
-            const totalDeferredFields = plan.reduce((sum, entity) => sum + entity.deferredFields.size, 0);
-            expect(totalDeferredFields).toBeGreaterThan(0);
-        });
+      // Should detect circular references in nested structures
+      const totalDeferredFields = plan.reduce((sum, entity) => sum + entity.deferredFields.size, 0);
+      expect(totalDeferredFields).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Performance and Edge Cases', () => {
+    it('should handle large fixture files efficiently', async () => {
+      const startTime = Date.now();
+
+      // Generate large fixture data
+      const fixtures: any = {};
+      for (let i = 1; i <= 100; i++) {
+        fixtures[`user${i}`] = {
+          entity: 'user',
+          data: {
+            name: `User ${i}`,
+            email: `user${i}@example.com`,
+            friends: i > 1 ? [`@user${i - 1}`] : [],
+            metadata: {
+              index: i,
+              description: `This is user number ${i}`,
+              tags: [`tag${i}`, `category${i % 10}`]
+            }
+          }
+        };
+      }
+
+      const yamlContent = Object.entries(fixtures)
+        .map(([key, value]) => `${key}:\n  count: ${(value as any).count}\n  data:\n    name: "${(value as any).data.name}"\n    email: "${(value as any).data.email}"`)
+        .join('\n\n');
+
+      const testFile = path.join(testFixturesDir, 'large.yml');
+      fs.writeFileSync(testFile, yamlContent);
+
+      const fixtureConfig = await loader.loadFixtures('large.yml');
+      const loadedFixtures = fixtureConfig.fixtures;
+      const processingTime = Date.now() - startTime;
+
+      expect(Object.keys(loadedFixtures)).toHaveLength(100);
+      expect(processingTime).toBeLessThan(5000); // Should complete within 5 seconds
     });
 
-    describe('Performance and Edge Cases', () => {
-        it('should handle large fixture files efficiently', async () => {
-            const startTime = Date.now();
-
-            // Generate large fixture data
-            const fixtures: any = {};
-            for (let i = 1; i <= 100; i++) {
-                fixtures[`user${i}`] = {
-                    entity: "user",
-                    data: {
-                        name: `User ${i}`,
-                        email: `user${i}@example.com`,
-                        friends: i > 1 ? [`@user${i - 1}`] : [],
-                        metadata: {
-                            index: i,
-                            description: `This is user number ${i}`,
-                            tags: [`tag${i}`, `category${i % 10}`]
-                        }
-                    }
-                };
-            }
-
-            const yamlContent = Object.entries(fixtures)
-                .map(([key, value]) => `${key}:\n  count: ${(value as any).count}\n  data:\n    name: "${(value as any).data.name}"\n    email: "${(value as any).data.email}"`)
-                .join('\n\n');
-
-            const testFile = path.join(testFixturesDir, 'large.yml');
-            fs.writeFileSync(testFile, yamlContent);
-
-            const fixtureConfig = await loader.loadFixtures('large.yml');
-            const loadedFixtures = fixtureConfig.fixtures;
-            const processingTime = Date.now() - startTime;
-
-            expect(Object.keys(loadedFixtures)).toHaveLength(100);
-            expect(processingTime).toBeLessThan(5000); // Should complete within 5 seconds
-        });
-
-        it('should handle empty and null values correctly', async () => {
-            const yamlContent = `
+    it('should handle empty and null values correctly', async () => {
+      const yamlContent = `
 entity1:
   entity: "entity"
   data:
@@ -447,18 +447,18 @@ entity1:
     metadata: {}
     active: false`;
 
-            const testFile = path.join(testFixturesDir, 'edge-cases.yml');
-            fs.writeFileSync(testFile, yamlContent);
+      const testFile = path.join(testFixturesDir, 'edge-cases.yml');
+      fs.writeFileSync(testFile, yamlContent);
 
-            const fixtureConfig = await loader.loadFixtures('edge-cases.yml');
-            const fixtures = fixtureConfig.fixtures;
-            const processedData = loader.processFixtureData(fixtures.entity1.data, {});
+      const fixtureConfig = await loader.loadFixtures('edge-cases.yml');
+      const fixtures = fixtureConfig.fixtures;
+      const processedData = loader.processFixtureData(fixtures.entity1.data, {});
 
-            expect(processedData.name).toBe('');
-            expect(processedData.description).toBeNull();
-            expect(processedData.tags).toEqual([]);
-            expect(processedData.metadata).toEqual({});
-            expect(processedData.active).toBe(false);
-        });
+      expect(processedData.name).toBe('');
+      expect(processedData.description).toBeNull();
+      expect(processedData.tags).toEqual([]);
+      expect(processedData.metadata).toEqual({});
+      expect(processedData.active).toBe(false);
     });
+  });
 });

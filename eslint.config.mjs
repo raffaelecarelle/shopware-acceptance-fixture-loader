@@ -7,19 +7,20 @@ import globals from 'globals';
 export default [
   // Base ESLint recommended rules
   eslint.configs.recommended,
-  
+
   // Configuration for main TypeScript files (excluding tests)
   {
-    files: ['*.ts', '*.tsx'],
+    files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        ecmaVersion: 2020,
-        sourceType: 'module',
-        project: './tsconfig.json'
+        ecmaVersion: 2022,
+        sourceType: 'module'
       },
       globals: {
-        ...globals.node
+        ...globals.node,
+        ...globals.jest,
+        ...globals.browser
       }
     },
     plugins: {
@@ -30,12 +31,12 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
-      
+
       // General ESLint rules
       'no-console': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
-      
+
       // Code style
       'indent': ['error', 2],
       'quotes': ['error', 'single'],
@@ -45,20 +46,30 @@ export default [
       'array-bracket-spacing': ['error', 'never']
     }
   },
-  
+
   // Configuration for test files
   {
-    files: ['tests/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+    files: ['tests/**/*.ts', '**/*.test.ts', '**/*.spec.ts', 'test/**/*.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        ecmaVersion: 2020,
+        ecmaVersion: 2022,
         sourceType: 'module'
-        // No project reference for test files since they're excluded from tsconfig.json
       },
       globals: {
         ...globals.node,
-        ...globals.jest
+        ...globals.jest,
+        ...globals.browser,
+        // Aggiungi specificamente le variabili Jest che mancano
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        describe: 'readonly',
+        test: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        jest: 'readonly'
       }
     },
     plugins: {
@@ -69,25 +80,41 @@ export default [
       // Relax some rules for test files
       '@typescript-eslint/no-explicit-any': 'off',
       'no-console': 'off',
-      
+      '@typescript-eslint/explicit-function-return-type': 'off',
+
       // Basic TypeScript rules for test files
       '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
-      
+
       // Playwright specific rules
       'playwright/missing-playwright-await': 'error',
       'playwright/no-page-pause': 'warn'
     }
   },
-  
+
+  // Configuration for JavaScript files (including config files)
+  {
+    files: ['**/*.js', '**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node
+      }
+    },
+    rules: {
+      // Meno restrittivo per i file di configurazione
+      'no-console': 'off'
+    }
+  },
+
   // Ignore patterns
   {
     ignores: [
       'dist/**',
       'node_modules/**',
       'coverage/**',
-      '*.js',
-      'eslint.config.js',
-      'eslint.config.mjs'
+      'build/**',
+      '*.min.js'
     ]
   }
 ];
