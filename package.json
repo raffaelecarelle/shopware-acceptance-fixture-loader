@@ -1,6 +1,6 @@
 {
     "name": "@raffaelecarelle/shopware-acceptance-fixture-loader",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "A TypeScript library for Shopware to create test data in Playwright using YAML fixtures",
     "type": "module",
     "exports": {
@@ -30,7 +30,6 @@
         "dist",
         "README.md"
     ],
-
     "repository": {
         "type": "git",
         "url": "https://github.com/raffaelecarelle/shopware-acceptance-fixture-loader"
