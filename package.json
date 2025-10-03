@@ -35,6 +35,7 @@
         "url": "https://github.com/raffaelecarelle/shopware-acceptance-fixture-loader"
     },
     "scripts": {
+        "ts-check": "tsc",
         "build:clean": "git clean -fX dist",
         "build:code": "tsdown",
         "build": "npm run build:code",
