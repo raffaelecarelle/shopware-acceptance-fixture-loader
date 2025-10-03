@@ -1,4 +1,5 @@
-import { YamlFixtureLoader, FixtureDefinition } from './YamlFixtureLoader';
+import { YamlFixtureLoader } from './YamlFixtureLoader';
+import type { FixtureDefinition } from './YamlFixtureLoader';
 import { CircularReferenceResolver } from './CircularReferenceResolver';
 
 export class YamlFixtureProcessor {

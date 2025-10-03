@@ -1,4 +1,4 @@
-import { FixtureDefinition } from './YamlFixtureLoader';
+import type { FixtureDefinition } from './YamlFixtureLoader';
 
 /**
  * Represents a fixture entity with its processing state

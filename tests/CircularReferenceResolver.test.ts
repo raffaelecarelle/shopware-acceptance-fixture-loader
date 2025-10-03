@@ -1,5 +1,5 @@
 import {CircularReferenceResolver} from '../CircularReferenceResolver';
-import {FixtureDefinition} from '../YamlFixtureLoader';
+import type {FixtureDefinition} from '../YamlFixtureLoader';
 
 describe('CircularReferenceResolver', () => {
     let resolver: CircularReferenceResolver;
