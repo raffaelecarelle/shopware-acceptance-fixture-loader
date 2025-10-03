@@ -64,32 +64,20 @@ jobs:
             -   name: Generate changelog
                 id: changelog
                 run: |
-                    # Install github-changelog-generator
-                    sudo gem install github_changelog_generator
+                    # Fetch full history
+                    git fetch --unshallow --tags
                     
-                    # Extract version from tag (remove 'v' prefix if present)
-                    VERSION="${{ github.ref_name }}"
-                    VERSION=${VERSION#v}
+                    # Get previous tag
+                    PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
                     
-                    # Generate changelog for this specific version
-                    github_changelog_generator \
-                        --user raffaelecarelle \
-                        --project shopware-acceptance-fixture-loader \
-                        --token ${{ secrets.GITHUB_TOKEN }} \
-                        --since-tag $(git describe --tags --abbrev=0 HEAD^) \
-                        --due-tag ${{ github.ref_name }} \
-                        --output /tmp/changelog.md \
-                        --no-verbose
-                    
-                    # Extract only the release notes for this version
-                    CHANGELOG=$(awk '/^## \['"$VERSION"'\]/,/^## \[/{if(/^## \['"$VERSION"'\]/) next; if(/^## \[/) exit; print}' /tmp/changelog.md)
-                    
-                    # If changelog is empty, fallback to commit messages
-                    if [ -z "$CHANGELOG" ]; then
-                        CHANGELOG=$(git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD^)..HEAD)
+                    # Generate simple changelog
+                    if [ -n "$PREV_TAG" ]; then
+                        CHANGELOG=$(git log --pretty=format:"- %s" $PREV_TAG..HEAD)
+                    else
+                        CHANGELOG="- Initial release ${{ github.ref_name }}"
                     fi
                     
-                    # Set output with proper multiline handling
+                    # Set output
                     {
                         echo "notes<<EOF"
                         echo "$CHANGELOG"
