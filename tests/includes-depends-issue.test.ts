@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { YamlFixtureLoader } from '../YamlFixtureLoader';
+import { YamlFixtureLoader } from '../src/YamlFixtureLoader';
 
 describe('Test @includes should encompass @depends issue', () => {
     let loader: YamlFixtureLoader;

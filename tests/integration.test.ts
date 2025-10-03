@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {YamlFixtureLoader} from '../YamlFixtureLoader';
-import {CircularReferenceResolver} from '../CircularReferenceResolver';
-import {YamlFixtureProcessor} from '../YamlFixtureProcessor';
+import {YamlFixtureLoader} from '../src/YamlFixtureLoader';
+import {CircularReferenceResolver} from '../src/CircularReferenceResolver';
+import {YamlFixtureProcessor} from '../src/YamlFixtureProcessor';
 import {TEST_FIXTURES_DIR} from './setup';
 
 describe('Integration Tests', () => {

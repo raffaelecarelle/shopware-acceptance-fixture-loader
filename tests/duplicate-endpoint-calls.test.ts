@@ -1,4 +1,4 @@
-import { YamlFixtureProcessor } from '../YamlFixtureProcessor';
+import { YamlFixtureProcessor } from '../src/YamlFixtureProcessor';
 import * as fs from 'fs';
 import * as path from 'path';
 

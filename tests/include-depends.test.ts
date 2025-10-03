@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { YamlFixtureLoader } from '../YamlFixtureLoader';
-import { YamlFixtureProcessor } from '../YamlFixtureProcessor';
+import { YamlFixtureLoader } from '../src/YamlFixtureLoader';
+import { YamlFixtureProcessor } from '../src/YamlFixtureProcessor';
 import { TEST_FIXTURES_DIR } from './setup';
 
 describe('Include and Depends Functionality', () => {

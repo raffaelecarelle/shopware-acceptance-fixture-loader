@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { YamlFixtureLoader } from '../YamlFixtureLoader';
+import { YamlFixtureLoader } from '../src/YamlFixtureLoader';
 
 describe('Reproduce @includes merging issue', () => {
     let loader: YamlFixtureLoader;

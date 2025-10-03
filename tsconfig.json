@@ -4,19 +4,16 @@
         "moduleResolution": "Bundler",
         "module": "ESNext",
         "strict": true,
-        "noEmit": true,
+        "noEmit": false,
+        "outDir": "./dist",
+        "declaration": true,
         "stripInternal": true,
-        "verbatimModuleSyntax": true,
         "skipLibCheck": true,
         "allowSyntheticDefaultImports": true,
         "resolveJsonModule": true
     },
     "exclude": [
         "node_modules",
-        "dist",
-        // Ignore the generated API documentation
-        "docs/api",
-        // required for the signature related tests on macOS #2280
-        "test/scripts/apidocs/temp"
+        "dist"
     ]
 }

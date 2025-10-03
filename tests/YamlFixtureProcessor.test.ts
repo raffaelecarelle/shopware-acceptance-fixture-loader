@@ -1,4 +1,4 @@
-import { YamlFixtureProcessor } from '../YamlFixtureProcessor';
+import { YamlFixtureProcessor } from '../src/YamlFixtureProcessor';
 import * as fs from 'fs';
 import * as path from 'path';
 import { TEST_FIXTURES_DIR } from './setup';
@@ -9,7 +9,7 @@ const mockLoader = {
     getFixturesDir: jest.fn().mockReturnValue('/mock/fixtures/dir')
 };
 
-jest.mock('../YamlFixtureLoader', () => {
+jest.mock('../src/YamlFixtureLoader', () => {
     return {
         YamlFixtureLoader: jest.fn(() => mockLoader)
     };
@@ -21,7 +21,7 @@ const mockResolver = {
     getDeferredUpdates: jest.fn()
 };
 
-jest.mock('../CircularReferenceResolver', () => {
+jest.mock('../src/CircularReferenceResolver', () => {
     return {
         CircularReferenceResolver: jest.fn(() => mockResolver)
     };
