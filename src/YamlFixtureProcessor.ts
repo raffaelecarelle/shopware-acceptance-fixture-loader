@@ -75,13 +75,21 @@ export class YamlFixtureProcessor {
         const entity = await this.findExistingEntity(
           processingEntity.fixture,
           adminApiContext,
-          { references: Object.fromEntries(this.references), data: {} }
+          {
+            references: Object.fromEntries(this.references),
+            data: {},
+            allFixtures: expandedFixtures
+          }
         );
 
         // If there's update data, apply it
         if (processingEntity.fixture.data) {
-          const context = { references: Object.fromEntries(this.references), data: {} };
-          const updateData = this.loader.processFixtureData(processingEntity.fixture.data, context);
+          const context = {
+            references: Object.fromEntries(this.references),
+            data: {},
+            allFixtures: expandedFixtures
+          };
+          const updateData = await this.loader.processFixtureData(processingEntity.fixture.data, context);
           await this.updateEntity(
             processingEntity.fixture.entity,
             entity.id,
@@ -97,9 +105,13 @@ export class YamlFixtureProcessor {
         this.createdEntities.set(processingEntity.name, entity.id);
       } else {
         // Create new entities with initial data (excluding circular references)
-        const context = { references: Object.fromEntries(this.references), data: {} };
+        const context = {
+          references: Object.fromEntries(this.references),
+          data: {},
+          allFixtures: expandedFixtures
+        };
         const initialData = resolver.getInitialData(processingEntity);
-        const processedData = this.loader.processFixtureData(initialData, context);
+        const processedData = await this.loader.processFixtureData(initialData, context);
 
         const entity = await this.createGenericEntity(
           processingEntity.fixture.entity,
@@ -278,8 +290,8 @@ export class YamlFixtureProcessor {
 
     // Process query criteria with references and placeholders
     const processedQuery = fixture.query
-      ? this.loader.processFixtureData(fixture.query, context)
-      : this.loader.processFixtureData(fixture.data, context);
+      ? await this.loader.processFixtureData(fixture.query, context)
+      : await this.loader.processFixtureData(fixture.data, context);
 
     // Build query parameters for the GET request
     const queryParams = new URLSearchParams();

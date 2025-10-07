@@ -115,8 +115,8 @@ product1:
 
       // Process fixture data with context
       const context = { systemData: {} };
-      const processedCustomer = loader.processFixtureData(fixtures.customer1.data, context);
-      const processedProduct = loader.processFixtureData(fixtures.product1.data, context);
+      const processedCustomer = await loader.processFixtureData(fixtures.customer1.data, context);
+      const processedProduct = await loader.processFixtureData(fixtures.product1.data, context);
 
       // Verify fake data generation
       expect(typeof processedCustomer.firstName).toBe('string');
@@ -180,7 +180,7 @@ product1:
         ]
       };
 
-      const processedProduct = loader.processFixtureData(fixtures.product1.data, context);
+      const processedProduct = await loader.processFixtureData(fixtures.product1.data, context);
 
       expect(processedProduct.categoryName).toBe('Electronics');
       expect(processedProduct.primaryTag).toBe('Popular');
@@ -345,7 +345,7 @@ order1:
 
       const fixtureConfig = await loader.loadFixtures('missing-refs.yml');
       const fixtures = fixtureConfig.fixtures;
-      const processedData = loader.processFixtureData(fixtures.order1.data, {});
+      const processedData = await loader.processFixtureData(fixtures.order1.data, {});
 
       // Should keep placeholder as-is when reference is missing
       expect(processedData.customerId).toBe('@nonexistentCustomer');
@@ -452,7 +452,7 @@ entity1:
 
       const fixtureConfig = await loader.loadFixtures('edge-cases.yml');
       const fixtures = fixtureConfig.fixtures;
-      const processedData = loader.processFixtureData(fixtures.entity1.data, {});
+      const processedData = await loader.processFixtureData(fixtures.entity1.data, {});
 
       expect(processedData.name).toBe('');
       expect(processedData.description).toBeNull();

@@ -148,7 +148,7 @@ vat_number: "{faker.vatNumber}" # Italian VAT number
 
 ## Advanced Features
 
-### @includes Directive
+### @includes Directive (File-level)
 
 Reuse and merge fixture data from other YAML files using the `@includes` directive at the top of your file:
 
@@ -193,6 +193,93 @@ fixtures:
 - **Automatically encompasses @depends** from included files and merges them with current file dependencies
 - **Deduplicates dependencies** to prevent fixtures from being executed multiple times
 
+### @include Directive (Entity-level)
+
+Include and merge data from a specific fixture that was already loaded via `@includes` at file level:
+
+```yaml
+# base_customers.yml
+fixtures:
+  default_customer:
+    entity: customer
+    data:
+      salutationId: "default-salutation-id"
+      firstName: "John"
+      lastName: "Doe"
+      email: "john@example.com"
+      password: "secret123"
+      addresses:
+        - street: "Main Street 123"
+          zipcode: "12345"
+          city: "Sample City"
+
+# orders.yml
+'@includes': 'base_customers.yml'  # Load base fixtures at file level
+fixtures:
+  order_1:
+    entity: order
+    data:
+      '@include': default_customer  # Reference the loaded fixture
+      firstName: "Jane"  # Overrides the included firstName
+      orderNumber: "ORD-001"
+      orderDate: "2024-01-01"
+```
+
+The resulting merged data for `order_1` will be:
+```yaml
+firstName: "Jane"           # Overridden from current entity
+lastName: "Doe"             # From included fixture
+email: "john@example.com"   # From included fixture
+salutationId: "default-salutation-id"  # From included fixture
+password: "secret123"       # From included fixture
+addresses:                  # From included fixture
+  - street: "Main Street 123"
+    zipcode: "12345"
+    city: "Sample City"
+orderNumber: "ORD-001"      # Current entity only
+orderDate: "2024-01-01"     # Current entity only
+```
+
+**Key features:**
+- Must use `@includes` at file level first to load the fixtures
+- Reference fixtures by their key using `'@include': fixture_key`
+- Current entity data overrides included data (deep merge for nested objects)
+- Works seamlessly with placeholders and faker data in included fixtures
+- Multiple entities can reuse the same base fixture
+
+**Reusing the same base across multiple entities:**
+```yaml
+'@includes': 'base_customers.yml'
+fixtures:
+  order_1:
+    entity: order
+    data:
+      '@include': default_customer
+      firstName: "Jane"
+      orderNumber: "ORD-001"
+
+  order_2:
+    entity: order
+    data:
+      '@include': default_customer
+      firstName: "Bob"
+      orderNumber: "ORD-002"
+```
+
+**Including from multiple base files:**
+```yaml
+'@includes':
+  - 'base_customers.yml'
+  - 'base_addresses.yml'
+fixtures:
+  customer_with_custom_address:
+    entity: customer
+    data:
+      '@include': default_customer
+      # Override with address data from another base
+      street: "{faker.location.streetAddress}"
+```
+
 ### @depends Directive
 
 Ensure fixtures are processed in the correct order using the `@depends` directive:
@@ -236,8 +323,9 @@ fixtures:
 
 ### Combined Usage
 
-You can use both directives in the same file:
+You can use all three directives together:
 
+**File-level directives (`@depends` and `@includes`):**
 ```yaml
 '@depends': 'base_entities.yml'  # Process dependencies first
 '@includes': 'shared_data.yml'    # Then merge shared fixture data
@@ -249,6 +337,25 @@ fixtures:
       baseId: "@base_entity"      # From dependency
       sharedValue: "@shared_data" # From included file
 ```
+
+**Combining file-level and entity-level includes:**
+```yaml
+'@includes': 'base_common.yml'    # Include common fixtures at file level
+fixtures:
+  customer_1:
+    entity: customer
+    data:
+      '@include.default_customer': 'base_customers.yml'  # Include specific entity data
+      '@include.default_address': 'base_addresses.yml'   # Include another entity data
+      firstName: "CustomName"      # Override included data
+      customField: "value"         # Add custom fields
+```
+
+This gives you maximum flexibility to:
+- Reuse entire fixture files with `@includes` (file-level)
+- Cherry-pick specific entity data with `@include.key` (entity-level)
+- Manage execution order with `@depends`
+- Override any included data as needed
 
 ### Multi-insertion Fixtures
 

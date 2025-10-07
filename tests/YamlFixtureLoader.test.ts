@@ -84,23 +84,23 @@ fixtures:
   });
 
   describe('processFixtureData', () => {
-    it('should process simple data without placeholders', () => {
+    it('should process simple data without placeholders', async () => {
       const data = { name: 'John', age: 30 };
       const context = {};
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
       expect(result).toEqual(data);
     });
 
-    it('should process array data', () => {
+    it('should process array data', async () => {
       const data = ['item1', 'item2', 'item3'];
       const context = {};
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
       expect(result).toEqual(data);
     });
 
-    it('should process nested objects', () => {
+    it('should process nested objects', async () => {
       const data = {
         user: {
           profile: {
@@ -113,20 +113,20 @@ fixtures:
       };
       const context = {};
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
       expect(result).toEqual(data);
     });
 
-    it('should handle null and undefined values', () => {
+    it('should handle null and undefined values', async () => {
       const data = { nullValue: null, undefinedValue: undefined };
       const context = {};
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
       expect(result.nullValue).toBeNull();
       expect(result.undefinedValue).toBeUndefined();
     });
 
-    it('should process faker placeholders', () => {
+    it('should process faker placeholders', async () => {
       const data = {
         name: '{faker.firstName}',
         email: '{faker.email}',
@@ -134,7 +134,7 @@ fixtures:
       };
       const context = {};
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
 
       expect(typeof result.name).toBe('string');
       expect(result.name).not.toBe('{faker.firstName}');
@@ -143,7 +143,7 @@ fixtures:
       expect(typeof result.company).toBe('string');
     });
 
-    it('should process context references', () => {
+    it('should process context references', async () => {
       const data = {
         greeting: 'Hello {context.userName}',
         message: 'Welcome {context.userName}, your role is {context.userRole}'
@@ -155,13 +155,13 @@ fixtures:
         }
       };
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
 
       expect(result.greeting).toBe('Hello testuser');
       expect(result.message).toBe('Welcome testuser, your role is admin');
     });
 
-    it('should process @ references', () => {
+    it('should process @ references', async () => {
       const data = {
         userId: '@user1'
       };
@@ -171,7 +171,7 @@ fixtures:
         }
       };
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
 
       expect(result.userId).toBe('user_123');
     });
@@ -194,7 +194,7 @@ fixtures:
       const fixtures = await loader.loadFixtures('integrated.yml');
       const context = {};
 
-      const processedData = loader.processFixtureData(fixtures.fixtures.user1.data, context);
+      const processedData = await loader.processFixtureData(fixtures.fixtures.user1.data, context);
 
       expect(typeof processedData.name).toBe('string');
       expect(processedData.name).toMatch(/^[A-Za-z\-'\s]+ [A-Za-z\-'\s]+$/);
@@ -204,7 +204,7 @@ fixtures:
       expect(typeof processedData.phone).toBe('string');
     });
 
-    it('should process fixture with context references', () => {
+    it('should process fixture with context references', async () => {
       const data = {
         greeting: 'Hello {context.userName}',
         message: 'Welcome {context.userName}, your role is {context.userRole}'
@@ -216,13 +216,13 @@ fixtures:
         }
       };
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
 
       expect(result.greeting).toBe('Hello testuser');
       expect(result.message).toBe('Welcome testuser, your role is admin');
     });
 
-    it('should process fixtures with array references', () => {
+    it('should process fixtures with array references', async () => {
       // Test che la classe NON supporta ancora i riferimenti ad array nested
       // Questo test documenta il comportamento attuale
       const data = {
@@ -239,7 +239,7 @@ fixtures:
         }
       };
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
 
       // Al momento i placeholder con array reference non vengono risolti
       expect(result.firstAddressId).toBe('address_addresses[0].id');
@@ -267,14 +267,14 @@ fixtures:
       expect(result).toBeUndefined(); // Empty YAML returns undefined, not null
     });
 
-    it('should handle missing context values gracefully', () => {
+    it('should handle missing context values gracefully', async () => {
       const data = {
         missing: '{context.nonExistent}',
         partial: 'Value: {context.missing}'
       };
       const context = { data: {} };
 
-      const result = loader.processFixtureData(data, context);
+      const result = await loader.processFixtureData(data, context);
 
       // La classe restituisce "undefined" per i valori mancanti del context
       expect(result.missing).toBe('undefined');
@@ -305,7 +305,7 @@ fixtures:
   });
 
   describe('Faker data generation', () => {
-    it('should generate consistent types for different faker calls', () => {
+    it('should generate consistent types for different faker calls', async () => {
       const data = {
         email1: '{faker.email}',
         email2: '{faker.internet.email}',
@@ -320,7 +320,7 @@ fixtures:
         italianVAT: '{faker.it_vat_number}'
       };
 
-      const result = loader.processFixtureData(data, {});
+      const result = await loader.processFixtureData(data, {});
 
       expect(result.email1).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);
       expect(result.email2).toMatch(/^[\w.-]+@[\w.-]+\.\w+$/);

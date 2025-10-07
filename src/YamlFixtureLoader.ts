@@ -298,27 +298,47 @@ export class YamlFixtureLoader {
   /**
      * Process fixture data with references and placeholders
      */
-  processFixtureData(data: any, context: any = {}): any {
+  async processFixtureData(data: any, context: any = {}): Promise<any> {
     if (typeof data === 'string') {
       // Process references like @entity_name or placeholders like {faker.name}
       return this.processStringValue(data, context);
     }
 
     if (Array.isArray(data)) {
-      return data.map(item => this.processFixtureData(item, context));
+      const processed = [];
+      for (const item of data) {
+        processed.push(await this.processFixtureData(item, context));
+      }
+      return processed;
     }
 
     if (typeof data === 'object' && data !== null) {
+      // Check for @include directive in entity data
+      let mergedData = { ...data };
+
+      if (data['@include']) {
+        const fixtureKey = data['@include'];
+
+        // Load and merge the included entity data from already loaded fixtures
+        const includedData = this.getIncludedEntityData(fixtureKey, context);
+
+        // Deep merge included data with current data (current data has priority)
+        mergedData = this.deepMerge(includedData, mergedData);
+
+        // Remove the @include directive from the final data
+        delete mergedData['@include'];
+      }
+
       // First pass: process all non-reference values
       const processed: any = {};
-      const contextWithData = { ...context, currentData: data };
+      const contextWithData = { ...context, currentData: mergedData };
 
-      for (const [key, value] of Object.entries(data)) {
+      for (const [key, value] of Object.entries(mergedData)) {
         if (typeof value === 'string' && value.includes('{') && value.includes('[')) {
           // Defer processing of nested array references until first pass is done
           processed[key] = value;
         } else {
-          processed[key] = this.processFixtureData(value, contextWithData);
+          processed[key] = await this.processFixtureData(value, contextWithData);
         }
       }
 
@@ -334,6 +354,61 @@ export class YamlFixtureLoader {
     }
 
     return data;
+  }
+
+  /**
+   * Deep merge two objects, with target values taking priority over source values
+   */
+  private deepMerge(source: any, target: any): any {
+    if (!source || typeof source !== 'object') {
+      return target;
+    }
+    if (!target || typeof target !== 'object') {
+      return source;
+    }
+
+    const result: any = { ...source };
+
+    for (const key in target) {
+      if (Object.prototype.hasOwnProperty.call(target, key)) {
+        const targetValue = target[key];
+        const sourceValue = source[key];
+
+        if (targetValue && typeof targetValue === 'object' && !Array.isArray(targetValue) &&
+            sourceValue && typeof sourceValue === 'object' && !Array.isArray(sourceValue)) {
+          // Both are objects (not arrays) - recursively merge
+          result[key] = this.deepMerge(sourceValue, targetValue);
+        } else {
+          // Target value takes priority (override source)
+          result[key] = targetValue;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Get data from an already loaded fixture by key
+   * Searches in the allFixtures from context (which includes fixtures from @includes)
+   */
+  private getIncludedEntityData(fixtureKey: string, context: any): any {
+    // Check if allFixtures is available in context (provided by YamlFixtureProcessor)
+    if (!context.allFixtures) {
+      throw new Error('Cannot use @include directive: no fixtures available in context. Make sure to use @includes at file level first.');
+    }
+
+    const allFixtures = context.allFixtures;
+
+    if (!allFixtures[fixtureKey]) {
+      const availableKeys = Object.keys(allFixtures).join(', ');
+      throw new Error(`Fixture key '${fixtureKey}' not found in loaded fixtures. Available keys: ${availableKeys}`);
+    }
+
+    const includedFixture = allFixtures[fixtureKey];
+
+    // Return the data property of the included fixture
+    return includedFixture.data || {};
   }
 
   private processStringValue(value: string, context: any): any {
