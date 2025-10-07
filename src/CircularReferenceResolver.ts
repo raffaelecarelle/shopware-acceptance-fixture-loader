@@ -28,6 +28,10 @@ export class CircularReferenceResolver {
   createProcessingPlan(fixtures: { [key: string]: FixtureDefinition }): ProcessingEntity[] {
     // Initialize all entities
     for (const [name, fixture] of Object.entries(fixtures)) {
+      if (this.entities.has(name)) {
+        continue;
+      }
+
       this.entities.set(name, {
         name,
         fixture,
@@ -38,6 +42,9 @@ export class CircularReferenceResolver {
       // Also add child entities
       if (fixture.children) {
         for (const [childName, childFixture] of Object.entries(fixture.children)) {
+          if (this.entities.has(childName)) {
+            continue;
+          }
           this.entities.set(childName, {
             name: childName,
             fixture: childFixture,
